@@ -1,499 +1,635 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Village Wars — TW Regras (Fix Click)</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>1.0</title>
 <style>
-  :root{ --bg:#e9dec1;--panel:#f7f0db;--wood:#8b5a2b;--wood-dark:#5d3b1a;--ink:#3a2a17;
-         --muted:#6f5a40;--accent:#2f7a3e;--border:#d2c3a3; }
+  :root{
+    --wood:#8b5a2b; --wood2:#5d3b1a; --ink:#2c2418; --muted:#6d5c45; --gold:#ddc796; --panel:#fffaf0;
+    --accent:#2f7a3e; --b:#d5c7a5; --shadow:#b79f6e; --danger:#a32a2a;
+  }
   *{box-sizing:border-box}
-  body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:radial-gradient(1200px 600px at 50% -200px,#fffdf6,#e9dec1) fixed;color:var(--ink)}
-  header{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,#fffdf5 0,#f7edd6 100%);border-bottom:4px solid var(--wood);box-shadow:0 8px 0 0 var(--wood-dark)}
-  .wrap{max-width:1240px;margin:0 auto;padding:10px 16px}
-  .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
-  .brand{font-weight:900;letter-spacing:.5px;color:var(--wood-dark);text-shadow:0 2px #f6e9ce}
-  .res{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}
-  .pill{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--border);padding:7px 10px;border-radius:10px;font-size:14px;box-shadow:inset 0 -1px #fff,0 2px 0 0 #d8caa8}
-  .pill b{font-weight:800}.pill small{color:var(--muted)}
-  main .wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
-  @media (max-width:980px){main .wrap{grid-template-columns:1fr}}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 6px 0 0 #dacbad}
-  h2,h3{margin:6px 0 10px}.sub{color:var(--muted);font-size:13px;margin:4px 0 10px}
-  .list{display:grid;gap:10px}
-  .card{border:1px solid var(--border);border-radius:12px;padding:12px;background:#fffaf0;box-shadow:inset 0 1px #fff,0 2px 0 0 #e0d2b3}
-  .card .row{justify-content:space-between}.name{font-weight:800}
-  .badge{font-size:12px;color:#fff;background:var(--wood);border:1px solid var(--wood-dark);border-radius:999px;padding:3px 8px}
-  .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  button{cursor:pointer;border:2px solid var(--wood-dark);color:#fff;padding:7px 12px;border-radius:10px;font-weight:800;background:linear-gradient(180deg,#7e4f24,#5d3b1a)}
-  button.primary{background:linear-gradient(180deg,#3e8c4b,#2f7a3e)}
-  button.danger{background:linear-gradient(180deg,#c24242,#a32a2a)}
-  button:disabled{filter:grayscale(.7) brightness(.9);cursor:not-allowed}
-  .costs{display:flex;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
-  .costs span{background:#f1e6cd;border:1px solid var(--border);border-radius:8px;padding:3px 8px}
-  .table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border-radius:10px;border:1px solid var(--border);background:#fffaf0}
-  .table th,.table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;font-size:14px}
-  .tabs{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
-  .tabs button{background:linear-gradient(180deg,#a17b4d,#7a5a32);border:2px solid var(--wood-dark)}
-  .tabs button.active{background:linear-gradient(180deg,#3e8c4b,#2f7a3e);border-color:#20582a}
-  #scene3d{height:520px;border:3px solid var(--wood);border-radius:12px;position:relative;overflow:hidden}
-  #scene3d::after{content:"";pointer-events:none;position:absolute;inset:-20%;background:radial-gradient(120% 80% at 50% 30%, rgba(255,255,255,0.0) 40%, rgba(0,0,0,.15) 85%);mix-blend-mode:multiply}
-  #hover-tip{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.92);border:1px solid var(--border);padding:4px 8px;border-radius:8px;font-size:12px;display:none}
-  input[type="number"],select{background:#faf2db;border:1px solid var(--border);border-radius:8px;padding:7px 8px}
-  #toast{position:fixed;right:12px;bottom:12px;display:none;background:#2f7a3e;color:#fff;border:2px solid #20582a;border-radius:10px;padding:10px 14px;font-weight:900;box-shadow:0 4px 0 #18441f}
-  #toast.error{background:#a32a2a;border-color:#701818}
+  html,body{height:100%}
+  body{margin:0; overflow:hidden; background:#cfc29d; color:var(--ink); font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;}
+  #game{position:fixed; inset:0}
+  #scene3d{position:absolute; inset:0;}
+  /* HUD */
+  #hudTop{position:absolute; left:0; right:0; top:0; min-height:64px; display:flex; align-items:center; gap:10px; padding:8px 12px;
+    background:linear-gradient(180deg, rgba(255,250,240,.95), rgba(255,250,240,.75)); border-bottom:3px solid var(--wood);
+    box-shadow:0 8px 0 0 var(--shadow); z-index:10; flex-wrap:wrap}
+  .brand{font-weight:900; letter-spacing:.3px; color:var(--wood2); text-shadow:0 1px #fff}
+  .rowflex{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  .res{display:flex; gap:8px; flex-wrap:wrap; margin-left:8px}
+  .pill{display:flex; gap:6px; align-items:center; background:#fffaf0cc; border:1px solid var(--b); padding:6px 10px; border-radius:12px; box-shadow:inset 0 -1px #fff,0 1px 0 #e9dfc4; font-weight:800}
+  .pill small{color:var(--muted); font-weight:700}
+  .right{margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  button{cursor:pointer; border:2px solid #5a3a1c; border-radius:10px; padding:7px 12px; color:#fff; font-weight:900; background:linear-gradient(180deg,#a17b4d,#7a5a32); box-shadow:0 2px 0 #6a4a28}
+  button.primary{background:linear-gradient(180deg,#3e8c4b,#2f7a3e); border-color:#20582a; box-shadow:0 2px 0 #20582a}
+  button.danger{background:linear-gradient(180deg,#c24242,#a32a2a); border-color:#6b1c1c; box-shadow:0 2px 0 #701818}
+  button.ghost{background:#ffffffc9; color:#2f2a20; border-color:#bca77c}
+  button:disabled{filter:grayscale(.7) brightness(.9); cursor:not-allowed}
+  /* Speed control */
+  .speed{display:flex; gap:6px; border:1px solid var(--b); border-radius:12px; padding:3px; background:#fffaf0cc; box-shadow:inset 0 -1px #fff,0 1px 0 #e9dfc4}
+  .chip{border:1px solid #bca77c; background:#ffffffd9; color:#2b2419; border-radius:10px; padding:6px 10px; font-weight:900}
+  .chip.active{background:linear-gradient(180deg,#3e8c4b,#2f7a3e); color:#fff; border-color:#20582a}
+  /* Context panel */
+  #panelRight{position:absolute; top:80px; bottom:16px; right:16px; width:560px; background:var(--panel); border:1px solid var(--b);
+    border-radius:14px; box-shadow:0 12px 0 0 var(--shadow); display:none; flex-direction:column; overflow:hidden; z-index:9;}
+  #panelRight.show{display:flex}
+  .head{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; background:#f6edd8; border-bottom:1px solid var(--b)}
+  .title{font-weight:900}
+  .content{flex:1; overflow:auto; padding:10px; background:#fffef8}
+  .list{display:grid; gap:10px}
+  .card{background:#fffdf6; border:1px solid var(--b); border-radius:12px; padding:10px; box-shadow:inset 0 1px #fff, 0 1px 0 #efe4c8}
+  .row{display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap}
+  .name{font-weight:900}
+  .badge{background:var(--wood); color:#fff; border:1px solid #4d321a; padding:3px 8px; border-radius:999px; font-size:12px}
+  .costs{display:flex; gap:8px; flex-wrap:wrap; font-size:13px; color:var(--muted)}
+  .costs span{background:#f2e7cb; border:1px solid var(--b); border-radius:8px; padding:2px 8px}
+  .muted{color:var(--muted); font-size:13px}
+  .mini-list{display:grid; gap:8px}
+  .mini-row{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center}
+  .mini-title{display:flex; align-items:center; gap:8px}
+  .mini-title small{color:var(--muted)}
+  /* Toast + tip */
+  #toast{position:absolute; right:16px; bottom:18px; background:#2f7a3e; color:#fff; border:2px solid #20582a; border-radius:10px; padding:10px 14px; font-weight:900; box-shadow:0 4px 0 #18441f; display:none; z-index:11}
+  #toast.error{background:#a32a2a; border-color:#701818}
+  #hover-tip{position:absolute; top:84px; left:20px; background:rgba(255,255,255,.9); border:1px solid var(--b); border-radius:8px; padding:4px 8px; font-size:12px; display:block; pointer-events:none; z-index:8}
+  @media (max-width:980px){
+    #panelRight{right:8px; left:8px; width:auto}
+  }
 </style>
 </head>
 <body>
-<header>
-  <div class="wrap row">
+<div id="game">
+  <div id="scene3d"><div id="hover-tip">Clique um prédio</div></div>
+  <div id="hudTop">
     <div class="brand">🏰 Village Wars</div>
     <div class="res">
-      <div class="pill"><span>Madeira</span><b id="r-wood">0</b><small id="p-wood">+0/s</small></div>
-      <div class="pill"><span>Argila</span><b id="r-clay">0</b><small id="p-clay">+0/s</small></div>
-      <div class="pill"><span>Ferro</span><b id="r-iron">0</b><small id="p-iron">+0/s</small></div>
-      <div class="pill"><span>Comida</span><b id="r-food">0</b><small id="p-food">+0/s</small></div>
-      <div class="pill"><span>População</span><b id="pop">0/0</b></div>
-      <div class="pill"><span>Armazém</span><b id="store">0</b></div>
+      <div class="pill">Madeira <b id="r-wood">0</b> <small id="p-wood">+0/s</small></div>
+      <div class="pill">Argila <b id="r-clay">0</b> <small id="p-clay">+0/s</small></div>
+      <div class="pill">Ferro <b id="r-iron">0</b> <small id="p-iron">+0/s</small></div>
+      <div class="pill">Comida <b id="r-food">0</b> <small id="p-food">+0/s</small></div>
+      <div class="pill">Pop <b id="pop">0/0</b></div>
+      <div class="pill">Armazém <b id="store">0</b></div>
     </div>
-    <div class="row" style="margin-left:auto">
-      <button id="btn-save" class="primary">Salvar</button>
+    <div class="right rowflex">
+      <div class="speed" id="speedBar">
+        <button class="chip active" data-speed="1">1x</button>
+        <button class="chip" data-speed="2">2x</button>
+        <button class="chip" data-speed="4">4x</button>
+        <button class="chip" data-speed="8">8x</button>
+      </div>
+      <button id="btn-save" class="ghost">Salvar</button>
       <button id="btn-reset" class="danger">Apagar Save</button>
     </div>
   </div>
-</header>
 
-<div id="toast"></div>
-
-<main>
-  <div class="wrap">
-    <section class="panel">
-      <h2>Visão da Aldeia</h2>
-      <div class="sub">Câmera 3D fixa em ângulo cinematográfico. Clique em um prédio para focar o cartão.</div>
-      <div id="scene3d"><div id="hover-tip"></div></div>
-      <div id="three-warning" class="sub" style="display:none;margin-top:8px;color:#a32a2a">Não foi possível inicializar o WebGL/Three.js.</div>
-    </section>
-
-    <section class="panel">
-      <div class="tabs">
-        <button class="tab-btn active" data-tab="unidades">Unidades</button>
-        <button class="tab-btn" data-tab="missoes">Praça (Missões)</button>
-        <button class="tab-btn" data-tab="mercado">Mercado</button>
-        <button class="tab-btn" data-tab="ferreiro">Ferreiro (Pesquisas)</button>
-        <button class="tab-btn" data-tab="exercito">Exército</button>
-        <button class="tab-btn" data-tab="ajuda">Ajuda</button>
+  <aside id="panelRight">
+    <div class="head">
+      <div class="title" id="panelTitle">—</div>
+      <div class="row">
+        <span class="badge" id="panelInfo"></span>
+        <button id="btn-close" class="ghost">Fechar</button>
       </div>
-
-      <div id="tab-unidades">
-        <h3>Treinar Unidades (instantâneo)</h3>
-        <div class="sub">Quartel/Estábulo/Oficina/Esconderijo/Estátua/Academia/Igreja liberam unidades. Cada nível do prédio aumenta a força das unidades dele em +10%.</div>
-        <div id="training-cards" class="list"></div>
-      </div>
-
-      <div id="tab-missoes" style="display:none">
-        <h3>Enviar Missão (Praça de Reuniões necessária)</h3>
-        <div class="card">
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-            <label>Dificuldade
-              <select id="mission-diff">
-                <option value="1">Fácil</option><option value="2">Normal</option><option value="3">Difícil</option>
-              </select>
-            </label>
-            <label>Bônus da Muralha
-              <div><span class="badge">Mitigação: <span id="wall-mit">0</span>%</span></div>
-            </label>
-            <label>Limite do HQ
-              <div><span class="badge">Nível HQ: <span id="hq-lvl">1</span></span></div>
-            </label>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">
-            <label>Espadachim <input type="number" min="0" value="0" id="send-sword"></label>
-            <label>Lanceiro <input type="number" min="0" value="0" id="send-spear"></label>
-            <label>Cavaleiro <input type="number" min="0" value="0" id="send-knight"></label>
-            <label>Aríete <input type="number" min="0" value="0" id="send-ram"></label>
-            <label>Catapulta <input type="number" min="0" value="0" id="send-cata"></label>
-            <label>Gatuno <input type="number" min="0" value="0" id="send-thief"></label>
-            <label>Mago <input type="number" min="0" value="0" id="send-mage"></label>
-            <label>Noviço <input type="number" min="0" value="0" id="send-novice"></label>
-            <label>Paladino <input type="number" min="0" value="0" id="send-pally"></label>
-          </div>
-          <div class="actions" style="margin-top:10px"><button id="btn-send-mission" class="primary">Enviar</button></div>
-        </div>
-        <div id="mission-active" class="card" style="display:none;margin-top:10px">
-          <div class="row"><div class="name">Missão Ativa</div><span id="mission-dets" class="badge"></span></div>
-          <div style="height:10px;background:#eadfc3;border-radius:999px;overflow:hidden;border:1px solid var(--border)"><div id="mq-bar" style="height:100%;background:linear-gradient(90deg,#2f7a3e,#6ea85d);width:0%"></div></div>
-          <div class="sub" id="mq-eta">—</div>
-          <table class="table" style="margin-top:8px"><thead><tr><th>Onda</th><th>Poder Inimigo</th><th>Resultado</th></tr></thead><tbody id="mq-waves"></tbody></table>
-        </div>
-        <div id="mission-log" class="list" style="margin-top:10px"></div>
-      </div>
-
-      <div id="tab-mercado" style="display:none">
-        <h3>Mercado</h3>
-        <div class="card">
-          <div class="sub">Taxa no Nível 1: <b>250%</b>. Reduz <b>10%</b> por nível, mínimo 10% (melhor nível → melhor troca). Recebimento = Montante ÷ (1 + taxa).</div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-            <label>Dar
-              <select id="trade-from"><option value="wood">Madeira</option><option value="clay">Argila</option><option value="iron">Ferro</option><option value="food">Comida</option></select>
-            </label>
-            <label>Receber
-              <select id="trade-to"><option value="clay">Argila</option><option value="iron">Ferro</option><option value="food">Comida</option><option value="wood">Madeira</option></select>
-            </label>
-            <label>Quantidade <input id="trade-amt" type="number" min="1" value="100"></label>
-          </div>
-          <div class="actions" style="margin-top:10px"><button id="btn-trade" class="primary">Trocar</button><span class="sub">Taxa atual: <b id="trade-fee">250%</b> — Retorno por 100: <b id="trade-ret">28</b></span></div>
-        </div>
-      </div>
-
-      <div id="tab-ferreiro" style="display:none">
-        <h3>Pesquisas rápidas</h3>
-        <div class="sub">Requer Ferreiro ≥ 1. Pesquisas são instantâneas e permanentes.</div>
-        <div id="smith-techs" class="list"></div>
-      </div>
-
-      <div id="tab-exercito" style="display:none">
-        <h3>Exército</h3>
-        <table class="table"><thead><tr><th>Unidade</th><th>Qtd</th><th>Atk Base</th><th>HP Base</th><th>Pop</th></tr></thead><tbody id="army-rows"></tbody></table>
-      </div>
-
-      <div id="tab-ajuda" style="display:none">
-        <h3>Resumo de regras</h3>
-        <ul class="sub">
-          <li><b>HQ</b> limita o nível dos demais prédios; Máx: 30. Custos dobram a cada nível.</li>
-          <li>Quartel/Estábulo/Oficina/Esconderijo/Academia/Igreja: +10% de força por nível nas suas unidades.</li>
-          <li><b>Bosque/Argila/Ferro</b>: ~30/min (N1) → ~2400/min (N30) (exponencial).</li>
-          <li><b>Fazenda</b> define Pop máx (≈ 24.000 no N30). <b>Armazém</b> limita recursos (≈ 400.000 no N30).</li>
-          <li><b>Muralha</b> reduz perdas em missões; <b>Praça</b> libera missões; <b>Estátua</b> libera Paladino.</li>
-        </ul>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>Construções</h2>
-      <div class="sub">Clique no modelo 3D para focar aqui. Construções são instantâneas.</div>
-      <div id="buildings" class="list"></div>
-    </section>
-  </div>
-</main>
+    </div>
+    <div class="content"><div id="panelBody" class="list"></div></div>
+  </aside>
+  <div id="toast"></div>
+</div>
 
 <script type="module">
 import * as THREE from "https://unpkg.com/three@0.158.0/build/three.module.js";
+import {OrbitControls} from "https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js";
 
 /* ===== Helpers ===== */
-const fmt = (n)=>Math.floor(n).toLocaleString('pt-BR');
-const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
-const deepClone = (o)=>JSON.parse(JSON.stringify(o));
-const qs = (sel,root=document)=>root.querySelector(sel);
-function toast(msg, isErr=false){ const t=qs('#toast'); t.textContent=msg; t.className=isErr?'error':''; t.style.display='block'; clearTimeout(toast._id); toast._id=setTimeout(()=>t.style.display='none',1600);}
-window.addEventListener('error', (e)=>{ console.error(e.error||e.message); toast('Erro: '+(e.message||'ver console'), true); });
+const fmt=(n)=>Math.floor(n).toLocaleString('pt-BR');
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const deepClone=(o)=>JSON.parse(JSON.stringify(o));
+const qs=(s,root=document)=>root.querySelector(s);
+function el(tag, html, cls){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
+function toast(msg,err=false){const t=qs('#toast');t.textContent=msg;t.className=err?'error':'';t.style.display='block';clearTimeout(toast._id);toast._id=setTimeout(()=>t.style.display='none',1500);}
+window.addEventListener('error',e=>{console.error(e.error||e.message);toast('Erro: '+(e.message||'ver console'),true)});
+const rand=(a,b)=>a+Math.random()*(b-a);
 
-/* ===== Design data ===== */
-const BUILDINGS = {
-  hq:{nome:'Edifício Principal (HQ)', max:30, baseCost:{wood:200,clay:200,iron:150,food:0}, costMult:2.0, efeito:(lvl)=>({})},
-  quartel:{nome:'Quartel', max:25, baseCost:{wood:120,clay:100,iron:80,food:30}, costMult:2.0, efeito:(lvl)=>({atkMul_quartel:0.10*lvl})},
-  estabulo:{nome:'Estábulo', max:20, baseCost:{wood:200,clay:160,iron:140,food:60}, costMult:2.0, efeito:(lvl)=>({atkMul_estabulo:0.10*lvl})},
-  oficina:{nome:'Oficina', max:15, baseCost:{wood:220,clay:220,iron:200,food:60}, costMult:2.0, efeito:(lvl)=>({atkMul_oficina:0.10*lvl})},
-  ferreiro:{nome:'Ferreiro', max:20, baseCost:{wood:150,clay:120,iron:180,food:60}, costMult:2.0, efeito:(lvl)=>({})},
-  mercado:{nome:'Mercado', max:25, baseCost:{wood:120,clay:120,iron:120,food:80}, costMult:2.0, efeito:(lvl)=>({})},
-  bosque:{nome:'Bosque', max:30, baseCost:{wood:60,clay:50,iron:40,food:0}, costMult:2.0, producao:'wood'},
-  argila:{nome:'Poço de Argila', max:30, baseCost:{wood:50,clay:60,iron:40,food:0}, costMult:2.0, producao:'clay'},
-  ferro:{nome:'Mina de Ferro', max:30, baseCost:{wood:50,clay:50,iron:60,food:0}, costMult:2.0, producao:'iron'},
-  fazenda:{nome:'Fazenda', max:30, baseCost:{wood:80,clay:60,iron:60,food:0}, costMult:2.0, efeito:(lvl)=>({popMax:Math.floor(60*Math.pow(1.23, Math.max(0,lvl-1)))})},
-  armazem:{nome:'Armazém', max:30, baseCost:{wood:90,clay:80,iron:80,food:0}, costMult:2.0, efeito:(lvl)=>({capacidade:Math.floor(780*Math.pow(1.24, Math.max(0,lvl-1)))})},
-  muralha:{nome:'Muralha', max:20, baseCost:{wood:120,clay:160,iron:200,food:0}, costMult:2.0, efeito:(lvl)=>({mitig:Math.min(0.02*lvl,0.6)})},
-  esconderijo:{nome:'Esconderijo', max:25, baseCost:{wood:100,clay:80,iron:60,food:40}, costMult:2.0, efeito:(lvl)=>({atkMul_esconderijo:0.10*lvl})},
-  praca:{nome:'Praça de Reuniões', max:30, baseCost:{wood:80,clay:60,iron:40,food:0}, costMult:2.0, efeito:(lvl)=>({})},
-  estatua:{nome:'Estátua', max:30, baseCost:{wood:250,clay:200,iron:200,food:80}, costMult:2.0, efeito:(lvl)=>({})},
-  academia:{nome:'Academia', max:25, baseCost:{wood:260,clay:220,iron:260,food:120}, costMult:2.0, efeito:(lvl)=>({atkMul_academia:0.10*lvl})},
-  igreja:{nome:'Igreja', max:25, baseCost:{wood:200,clay:200,iron:240,food:140}, costMult:2.0, efeito:(lvl)=>({atkMul_igreja:0.10*lvl})},
+/* ===== Game Data ===== */
+let SPEED=1; // 1x 2x 4x 8x
+const BUILDINGS={
+  hq:{nome:'Edifício Principal (HQ)',max:30,baseCost:{wood:200,clay:200,iron:150,food:0},costMult:2.0,efeito:(lvl)=>({})},
+  casas:{nome:'Casas',max:30,baseCost:{wood:120,clay:100,iron:80,food:30},costMult:2.0,efeito:(lvl)=>({popMax: (2*Math.min(lvl,9)) + (4*Math.max(0,Math.min(lvl-9,10))) + (6*Math.max(0,lvl-19)) })},
+  quartel:{nome:'Quartel',max:25,baseCost:{wood:140,clay:120,iron:100,food:40},costMult:2.0,efeito:(lvl)=>({atkMul_quartel:0.10*lvl})},
+  estabulo:{nome:'Estábulo',max:20,baseCost:{wood:200,clay:160,iron:140,food:60},costMult:2.0,efeito:(lvl)=>({atkMul_estabulo:0.10*lvl})},
+  oficina:{nome:'Oficina',max:15,baseCost:{wood:220,clay:220,iron:200,food:60},costMult:2.0,efeito:(lvl)=>({atkMul_oficina:0.10*lvl})},
+  ferreiro:{nome:'Ferreiro',max:20,baseCost:{wood:150,clay:120,iron:180,food:60},costMult:2.0,efeito:(lvl)=>({})},
+  mercado:{nome:'Mercado',max:25,baseCost:{wood:120,clay:120,iron:120,food:80},costMult:2.0,efeito:(lvl)=>({})},
+  bosque:{nome:'Bosque',max:30,baseCost:{wood:60,clay:50,iron:40,food:0},costMult:2.0,producao:'wood'},
+  argila:{nome:'Poço de Argila',max:30,baseCost:{wood:50,clay:60,iron:40,food:0},costMult:2.0,producao:'clay'},
+  ferro:{nome:'Mina de Ferro',max:30,baseCost:{wood:50,clay:50,iron:60,food:0},costMult:2.0,producao:'iron'},
+  fazenda:{nome:'Fazendas',max:30,baseCost:{wood:80,clay:60,iron:60,food:0},costMult:2.0,producao:'food'},
+  armazem:{nome:'Armazém',max:30,baseCost:{wood:90,clay:80,iron:80,food:0},costMult:2.0,efeito:(lvl)=>({capacidade:Math.floor(780*Math.pow(1.24,Math.max(0,lvl-1)))})},
+  praca:{nome:'Praça de Reuniões',max:30,baseCost:{wood:80,clay:60,iron:40,food:0},costMult:2.0,efeito:(lvl)=>({})},
 };
-const PROD_BASE_PER_SEC = 0.5; // 30/min
-const PROD_FACTOR = Math.pow(80, 1/29); // ~1.163 → L30 ~ 40/s
+const PROD_BASE_PER_SEC=0.75;
+const PROD_FACTOR=Math.pow(80,1/29);
+const MAP_RADIUS=150;
+const HQ_SCALE=1.35;
 
-const UNITS = {
-  spear:{nome:'Lanceiro', atk:5, hp:12, pop:1, predio:'quartel', custo:{wood:30,clay:40,iron:20,food:10}},
-  sword:{nome:'Espadachim', atk:8, hp:14, pop:1, predio:'quartel', custo:{wood:50,clay:30,iron:30,food:10}},
-  knight:{nome:'Cavaleiro', atk:28, hp:30, pop:4, predio:'estabulo', custo:{wood:150,clay:120,iron:180,food:60}},
-  ram:{nome:'Aríete', atk:40, hp:30, pop:5, predio:'oficina', custo:{wood:200,clay:150,iron:100,food:40}},
-  cata:{nome:'Catapulta', atk:75, hp:25, pop:8, predio:'oficina', custo:{wood:250,clay:200,iron:240,food:80}},
-  thief:{nome:'Gatuno', atk:10, hp:10, pop:1, predio:'esconderijo', custo:{wood:70,clay:30,iron:50,food:30}},
-  pally:{nome:'Paladino', atk:60, hp:90, pop:4, predio:'estatua', unico:true, custo:{wood:300,clay:250,iron:300,food:120}},
-  mage:{nome:'Mago', atk:45, hp:35, pop:2, predio:'academia', custo:{wood:160,clay:140,iron:180,food:70}},
-  novice:{nome:'Noviço', atk:18, hp:28, pop:1, predio:'igreja', custo:{wood:90,clay:80,iron:100,food:40}},
-};
-const TECHS = {
-  blades:{nome:'Lâminas Afiadas', desc:'+10% ATK de Lanceiro/Espadachim/Cavaleiro', custo:{wood:300,clay:300,iron:300,food:200}},
-  logistics:{nome:'Logística Eficiente', desc:'+10% produção de recursos', custo:{wood:400,clay:400,iron:400,food:250}},
-  fortify:{nome:'Fortificação', desc:'+10% mitigação da Muralha', custo:{wood:350,clay:350,iron:350,food:200}},
+const UNITS={
+  spear:{nome:'Lanceiro',atk:5,hp:12,pop:1,predio:'quartel',custo:{wood:30,clay:40,iron:20,food:10}},
+  sword:{nome:'Espadachim',atk:8,hp:14,pop:1,predio:'quartel',custo:{wood:50,clay:30,iron:30,food:10}},
+  knight:{nome:'Cavaleiro',atk:28,hp:30,pop:1,predio:'estabulo',custo:{wood:150,clay:120,iron:180,food:60}},
+  ram:{nome:'Aríete',atk:40,hp:30,pop:1,predio:'oficina',custo:{wood:200,clay:150,iron:100,food:40}},
+  cata:{nome:'Catapulta',atk:75,hp:25,pop:1,predio:'oficina',custo:{wood:250,clay:200,iron:240,food:80}},
 };
 
 /* ===== Estado ===== */
-function defaultBuildings(){ const b={}; for(const k of Object.keys(BUILDINGS)) b[k]=0; b.hq=1; b.fazenda=1; b.armazem=1; return b; }
-const DEFAULT_STATE={ recursos:{wood:200,clay:200,iron:200,food:120}, predios:defaultBuildings(), unidades:{}, techs:{}, missao:null, log:[], reservPop:0 };
-for(const u in UNITS) DEFAULT_STATE.unidades[u]=0;
-let S = load(); function load(){ try{ const raw=localStorage.getItem('vw-tw'); if(raw) return {...DEFAULT_STATE, ...JSON.parse(raw)} }catch(e){} return deepClone(DEFAULT_STATE) }
-function save(){ localStorage.setItem('vw-tw', JSON.stringify(S)) }
+function defaultBuildings(){const b={}; for(const k of Object.keys(BUILDINGS)) b[k]=0; b.hq=1; b.armazem=1; b.fazenda=1; return b;}
+const DEFAULT={recursos:{wood:200,clay:200,iron:200,food:120},predios:defaultBuildings(),unidades:{},techs:{},missao:null,log:[],reservPop:0, villagers:[]};
+for(const u in UNITS) DEFAULT.unidades[u]=0;
+let S=(function(){try{const raw=localStorage.getItem('vw-tw'); if(raw) return {...DEFAULT,...JSON.parse(raw)} }catch(e){} return deepClone(DEFAULT)})();
+const save=()=>localStorage.setItem('vw-tw',JSON.stringify(S));
 
-/* ===== Regras ===== */
+/* ===== Pop & Economia ===== */
 const nivel=(id)=>S.predios[id]||0;
 function efeitos(){
   const e={popMax:0,capacidade:500};
-  for(const [id,def] of Object.entries(BUILDINGS)){ const lvl=nivel(id); if(def.efeito){ const add=def.efeito(lvl)||{}; for(const k in add){ e[k]=(e[k]||0)+add[k] } } }
-  e.popMax=Math.max(e.popMax,30); e.capacidade=Math.max(e.capacidade,1000); return e;
+  for(const [id,def] of Object.entries(BUILDINGS)){
+    const lvl=nivel(id);
+    if(def.efeito){const add=def.efeito(lvl)||{}; for(const k in add){e[k]=(e[k]||0)+add[k]}}
+  }
+  e.popMax=Math.max(e.popMax,3);
+  e.capacidade=Math.max(e.capacidade,1000);
+  return e;
 }
 const storageCap=()=>efeitos().capacidade;
 const popCap=()=>efeitos().popMax;
-const usedPop=()=>Object.entries(S.unidades).reduce((a,[t,n])=>a+n*(UNITS[t].pop||0),0);
-const freePop=()=>Math.max(0,popCap()-usedPop()-S.reservPop);
-
-function canPay(c){ return Object.entries(c).every(([k,v])=>(S.recursos[k]||0)>=v) }
-function pay(c){ for(const [k,v] of Object.entries(c)){ S.recursos[k]-=v } }
-function costBuilding(id){ const def=BUILDINGS[id], lvl=nivel(id); const c={}; for(const r of ['wood','clay','iron','food']) c[r]=Math.floor((def.baseCost[r]||0)*Math.pow(def.costMult, Math.max(0,lvl))); return c; }
-
+const podePagar=(c)=>Object.entries(c).every(([k,v])=>(S.recursos[k]||0)>=v);
+const pagar=(c)=>{for(const [k,v] of Object.entries(c)){S.recursos[k]-=v}};
+const custoPredio=(id)=>{const d=BUILDINGS[id],lvl=nivel(id),c={}; for(const r of ['wood','clay','iron','food']) c[r]=Math.floor((d.baseCost[r]||0)*Math.pow(d.costMult,Math.max(0,lvl))); return c; };
 function upgrade(id){
-  const def=BUILDINGS[id]; const lvl=nivel(id);
-  if(id!=='hq' && lvl>=S.predios.hq) return toast('Limite do HQ. Aumente o HQ primeiro.', true);
-  if(lvl>=def.max) return toast('Nível máximo atingido.', true);
-  const c=costBuilding(id); if(!canPay(c)) return toast('Recursos insuficientes.', true);
-  pay(c); S.predios[id]=lvl+1; updateMesh(id); toast((lvl===0?'Construído: ':'Aprimorado: ')+def.nome+' (N'+(lvl+1)+'/'+def.max+')'); render();
+  const d=BUILDINGS[id],lvl=nivel(id);
+  if(id!=='hq' && lvl>=S.predios.hq) return toast('Limite do HQ. Aumente o HQ primeiro.',true);
+  if(lvl>=d.max) return toast('Nível máximo.',true);
+  const c=custoPredio(id);
+  if(!podePagar(c)) return toast('Recursos insuficientes.',true);
+  pagar(c); S.predios[id]=lvl+1;
+  if(id==='casas'){spawnNewVillagers(calcHouseIncrement(lvl+1)-calcHouseIncrement(lvl));}
+  updateMesh(id); layoutHousesVisual(); toast((lvl===0?'Construído: ':'Aprimorado: ')+d.nome+' N'+(lvl+1));
+  renderTop(); if(CUR===id || CUR==='hq') renderPanel(CUR||id);
 }
-
+function calcHouseIncrement(lvl){
+  return (2*Math.min(lvl,9)) + (4*Math.max(0,Math.min(lvl-9,10))) + (6*Math.max(0,lvl-19));
+}
 function prodPerSec(){
   const r={wood:0,clay:0,iron:0,food:0};
-  const m={'bosque':'wood','argila':'clay','ferro':'iron'};
-  for(const [bid,typ] of Object.entries(m)){ const lvl=nivel(bid); if(lvl>0){ r[typ]+=PROD_BASE_PER_SEC*Math.pow(PROD_FACTOR,lvl-1); } }
-  r.food += 0.2*(r.wood+r.clay+r.iron)/3;
-  if(S.techs.logistics) for(const k of ['wood','clay','iron','food']) r[k]*=1.10;
+  const m={'bosque':'wood','argila':'clay','ferro':'iron','fazenda':'food'};
+  for(const [bid,typ] of Object.entries(m)){
+    const lvl=nivel(bid); if(lvl>0){ r[typ]+=PROD_BASE_PER_SEC*Math.pow(PROD_FACTOR,lvl-1); }
+  }
+  for(const k in r) r[k]*=SPEED;
   return r;
 }
-function marketFee(){ const lvl=nivel('mercado'); let fee = 2.5 - 0.10*(Math.max(1,lvl)-1); return Math.max(0.10, fee); }
-function atkMul(tipo){
-  const p=UNITS[tipo].predio; let m=1; const lvl=nivel(p);
-  if(['quartel','estabulo','oficina','esconderijo','academia','igreja'].includes(p)) m*=1+0.10*lvl;
-  if(S.techs.blades && (tipo==='spear'||tipo==='sword'||tipo==='knight')) m*=1.10;
-  return m;
-}
-const hpMul=(tipo)=>atkMul(tipo);
 
-function train(tipo,q){
-  const u=UNITS[tipo]; const pred=u.predio;
-  if(nivel(pred)<1) return toast('Requer '+BUILDINGS[pred].nome+' N1', true);
-  if(u.unico && S.unidades[tipo]>=1) return toast('Paladino é único.', true);
+/* ===== HQ: gestão de construções ===== */
+function renderHQManager(box){
+  const card=el('div','', 'card');
+  card.append(el('div','<div class="name">Gerenciar Construções</div><div class="muted">Aprimore outros prédios diretamente pelo HQ. Respeita o limite do HQ e os recursos.</div>'));
+  const mini=el('div','', 'mini-list');
+  const ids=Object.keys(BUILDINGS).filter(k=>k!=='hq');
+  ids.forEach(id=>{
+    const def=BUILDINGS[id], lvl=nivel(id), max=def.max;
+    const nextCost=custoPredio(id);
+    const title=el('div','', 'mini-row');
+    const left=el('div',`<div class="mini-title"><b>${def.nome}</b> <small>Nível ${lvl}/${max}</small></div>`);
+    const right=el('div');
+    const btn=el('button', lvl>=max?'Máx': (lvl>=S.predios.hq?'Limite HQ': (lvl===0?'Construir':'Aprimorar')), 'primary');
+    btn.dataset.up=id;
+    if(lvl>=max || lvl>=S.predios.hq || !podePagar(nextCost)) btn.disabled=true;
+    right.append(btn);
+    title.append(left); title.append(right);
+    mini.append(title);
+    const costs=el('div','', 'costs');
+    costs.append(el('span','Custo:'));
+    costs.append(el('span','🪵 '+fmt(nextCost.wood||0)));
+    costs.append(el('span','🧱 '+fmt(nextCost.clay||0)));
+    costs.append(el('span','⛓️ '+fmt(nextCost.iron||0)));
+    costs.append(el('span','🥖 '+fmt(nextCost.food||0)));
+    mini.append(costs);
+  });
+  // botão "Aprimorar tudo"
+  const row=el('div','', 'row'); const bAll=el('button','Aprimorar tudo (1 nível)',''); bAll.dataset.upAll='1'; row.append(bAll);
+  card.append(mini); card.append(row);
+  box.append(card);
+}
+function upgradeAllOnce(){
+  const list=Object.keys(BUILDINGS).filter(k=>k!=='hq').map(id=>({id, cost:custoPredio(id)}));
+  list.sort((a,b)=>(a.cost.wood+a.cost.clay+a.cost.iron+a.cost.food)-(b.cost.wood+b.cost.clay+b.cost.iron+b.cost.food));
+  let done=0;
+  for(const item of list){
+    const id=item.id, lvl=nivel(id), def=BUILDINGS[id];
+    if(lvl>=def.max) continue;
+    if(lvl>=S.predios.hq) continue;
+    const c=custoPredio(id);
+    if(!podePagar(c)) continue;
+    pagar(c); S.predios[id]=lvl+1;
+    if(id==='casas'){spawnNewVillagers(calcHouseIncrement(lvl+1)-calcHouseIncrement(lvl));}
+    updateMesh(id); layoutHousesVisual();
+    done++;
+  }
+  renderTop(); if(CUR) renderPanel(CUR);
+  if(done===0) toast('Nada para aprimorar (recursos/limites).',true); else toast('Aprimorados '+done+' prédios.');
+}
+
+/* ===== Unidades usam Aldeões ===== */
+function freeVillagers(){return S.villagers.filter(v=>v.role==='worker' && !v.assigned).length}
+function pickFreeVillagers(q){const arr=S.villagers.filter(v=>v.role==='worker' && !v.assigned); return arr.slice(0,q);}
+function treinar(t,q){
+  const u=UNITS[t],p=u.predio;
+  if(nivel(p)<1) return toast('Requer '+BUILDINGS[p].nome+' N1',true);
   q=Math.max(0,Math.floor(q)); if(q<=0) return;
-  const pop=u.pop*q; if(pop>freePop()) return toast('População insuficiente (aumente a Fazenda).', true);
+  if(S.villagers.length+0 > popCap()) return toast('Capacidade de população atingida (Casas).',true);
+  if(freeVillagers()<q) return toast('Aldeões livres insuficientes.',true);
   const total={wood:u.custo.wood*q,clay:u.custo.clay*q,iron:u.custo.iron*q,food:u.custo.food*q};
-  if(!canPay(total)) return toast('Recursos insuficientes.', true);
-  pay(total); S.unidades[tipo]+=q; toast('Treinados '+q+' '+u.nome+(q>1?'s':'')); render();
+  if(!podePagar(total)) return toast('Recursos insuficientes.',true);
+  pagar(total);
+  const chosen=pickFreeVillagers(q);
+  chosen.forEach(v=>{setVillagerRole(v, t)});
+  S.unidades[t]+=q;
+  toast('Treinados '+q+' '+u.nome+(q>1?'s':''));
+  renderTop(); if(CUR===p) renderPanel(p);
 }
 
-/* Missões */
-const needRally=()=>nivel('praca')<1;
-const missionDur=(d)=>d===1?45000:(d===2?60000:90000);
-function waves(d){ const arr=[]; let base=75*d; for(let i=1;i<=3;i++){ const mult=Math.pow(1.55,i-1); const jitter=0.9+Math.random()*0.2; arr.push({poder:Math.floor(base*mult*jitter),res:null}); } return arr; }
-function sendMission(d, envio){
-  if(needRally()) return toast('Construa a Praça de Reuniões para enviar missões.', true);
-  for(const t in envio){ if(envio[t]>(S.unidades[t]||0)) return toast('Unidades insuficientes.', true); }
-  const popEnv=Object.entries(envio).reduce((a,[t,n])=>a+n*UNITS[t].pop,0); S.reservPop+=popEnv;
-  for(const t in envio) S.unidades[t]-=envio[t];
-  const now=Date.now(); const fim=now+missionDur(d);
-  S.missao={diff:d,envio,ini:now,fim,ondas:waves(d)}; toast('Missão enviada!'); renderMissions();
-}
-function simulateMission(){
-  const M=S.missao; if(!M) return;
-  const cur=deepClone(M.envio); let ATK=0,HP=0;
-  for(const t in cur){ const n=cur[t]; ATK+=n*UNITS[t].atk*atkMul(t); HP+=n*UNITS[t].hp*hpMul(t); }
-  const mit=nivel('muralha')>0?BUILDINGS.muralha.efeito(nivel('muralha')).mitig:0; if(S.techs.fortify) HP*=1.10;
-  let ok=true;
-  for(const w of M.ondas){ const under=Math.max(1,w.poder/Math.max(1,ATK)); const dano=w.poder*under*(1-mit); HP-=dano; w.res=(HP>0)?'sobreviveu':'derrotado'; if(HP<=0){ ok=false; break; } }
-  const perda = ok? 0.15*(1-mit):0.7;
-  const baixa={}, rest={}; for(const t in cur){ const n=cur[t]; const lost=Math.min(n,Math.floor(n*perda)); baixa[t]=lost; rest[t]=n-lost; }
-  const mult=ok?1.0:0.4, base=(M.diff===1?180:(M.diff===2?320:520))*mult;
-  const recompensa={wood:Math.floor(base*(0.9+Math.random()*0.3)),clay:Math.floor(base*(0.9+Math.random()*0.3)),iron:Math.floor(base*(0.9+Math.random()*0.3)),food:Math.floor(0.6*base*(0.9+Math.random()*0.3))};
-  return {ok,baixa,rest,recompensa};
-}
-function finishMission(){
-  const M=S.missao; if(!M) return;
-  const r=simulateMission();
-  const popEnv=Object.entries(M.envio).reduce((a,[t,n])=>a+n*UNITS[t].pop,0); S.reservPop-=popEnv;
-  for(const t in r.rest) S.unidades[t]+=r.rest[t];
-  if(r.ok){ for(const k in r.recompensa) S.recursos[k]+=r.recompensa[k]; toast('Missão concluída!'); } else toast('Missão falhou.', true);
-  S.log.unshift({quando:new Date().toLocaleString('pt-BR'), diff:M.diff, sucesso:r.ok, envio:M.envio, baixa:r.baixa, recompensa:r.ok?r.recompensa:null, ondas:M.ondas});
-  S.log=S.log.slice(0,6); S.missao=null; render(); renderLog();
-}
-
-/* Loop */
+/* ===== Loop ===== */
 let last=Date.now();
 function tick(){
-  const now=Date.now(), dt=(now-last)/1000; last=now;
+  const now=Date.now(), dt=((now-last)/1000)*SPEED; last=now;
   const pr=prodPerSec();
   for(const k of ['wood','clay','iron','food']){ S.recursos[k]+= (pr[k]||0)*dt; S.recursos[k]=Math.min(S.recursos[k], storageCap()); }
-  if(S.missao && now>=S.missao.fim) finishMission();
-  render();
+  updateVillagers(dt);
+  renderTop();
   requestAnimationFrame(tick);
 }
 
-/* UI Render */
+/* ===== UI Top / Painel Contextual ===== */
 function renderTop(){
   const p=prodPerSec(), eff=efeitos();
-  qs('#r-wood').textContent=fmt(S.recursos.wood);
-  qs('#r-clay').textContent=fmt(S.recursos.clay);
-  qs('#r-iron').textContent=fmt(S.recursos.iron);
-  qs('#r-food').textContent=fmt(S.recursos.food);
-  qs('#p-wood').textContent='+'+(p.wood||0).toFixed(2)+'/s';
-  qs('#p-clay').textContent='+'+(p.clay||0).toFixed(2)+'/s';
-  qs('#p-iron').textContent='+'+(p.iron||0).toFixed(2)+'/s';
-  qs('#p-food').textContent='+'+(p.food||0).toFixed(2)+'/s';
-  qs('#pop').textContent=(usedPop()+S.reservPop)+'/'+eff.popMax;
+  qs('#r-wood').textContent=fmt(S.recursos.wood); qs('#r-clay').textContent=fmt(S.recursos.clay);
+  qs('#r-iron').textContent=fmt(S.recursos.iron); qs('#r-food').textContent=fmt(S.recursos.food);
+  qs('#p-wood').textContent='+'+(p.wood||0).toFixed(2)+'/s'; qs('#p-clay').textContent='+'+(p.clay||0).toFixed(2)+'/s';
+  qs('#p-iron').textContent='+'+(p.iron||0).toFixed(2)+'/s'; qs('#p-food').textContent='+'+(p.food||0).toFixed(2)+'/s';
+  qs('#pop').textContent=S.villagers.length +'/'+eff.popMax;
   qs('#store').textContent=fmt(eff.capacidade);
 }
-function renderBuildings(){
-  const c=qs('#buildings'); c.innerHTML='';
-  for(const [id,def] of Object.entries(BUILDINGS)){
-    const lvl=nivel(id), cst=costBuilding(id);
-    const card=document.createElement('div'); card.className='card'; card.dataset.card=id;
-    const limStr=(id!=='hq'?' / Limite HQ: '+S.predios.hq:'')+' / Máx: '+def.max;
-    card.innerHTML='<div class="row"><div><div class="name">'+def.nome+'</div><span class="badge">Nível '+lvl+limStr+'</span></div><div class="actions"><button data-up="'+id+'" class="primary">'+(lvl===0?'Construir':'Aprimorar')+'</button></div></div><div class="costs"><span>Custo:</span><span>🪵 '+fmt(cst.wood||0)+'</span><span>🧱 '+fmt(cst.clay||0)+'</span><span>⛓️ '+fmt(cst.iron||0)+'</span><span>🥖 '+fmt(cst.food||0)+'</span><span>⚡ Instantâneo</span></div>';
-    c.appendChild(card);
-  }
+function attachSpeedUI(){
+  const bar=qs('#speedBar');
+  bar.addEventListener('click', (e)=>{
+    const chip=e.target.closest('.chip'); if(!chip) return;
+    bar.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    SPEED=parseInt(chip.dataset.speed,10)||1;
+  });
 }
-function renderTrain(){
-  const box=qs('#training-cards'); box.innerHTML='';
-  for(const [id,u] of Object.entries(UNITS)){
-    const pred=u.predio, lvl=nivel(pred), lock=lvl<1, c=u.custo;
-    const card=document.createElement('div'); card.className='card';
-    const unico=u.unico?' • único':'';
-    card.innerHTML='<div class="row"><div><div class="name">'+u.nome+'</div><span class="badge">'+BUILDINGS[pred].nome+' N'+lvl+unico+'</span></div><div class="actions">'+(lock?'<button disabled>Treinar</button>':'<input type="number" min="1" value="1" id="q-'+id+'"><button data-tr="'+id+'" class="primary">Treinar</button>')+'</div></div><div class="costs"><span>Por unidade:</span><span>🪵 '+fmt(c.wood)+'</span><span>🧱 '+fmt(c.clay)+'</span><span>⛓️ '+fmt(c.iron)+'</span><span>🥖 '+fmt(c.food)+'</span><span>👥 '+u.pop+'</span></div>';
-    box.appendChild(card);
-  }
-}
-function renderArmy(){
-  const tbody=qs('#army-rows'); tbody.innerHTML='';
-  for(const [id,u] of Object.entries(UNITS)){ const tr=document.createElement('tr'); tr.innerHTML='<td>'+u.nome+'</td><td>'+fmt(S.unidades[id])+'</td><td>'+u.atk+'</td><td>'+u.hp+'</td><td>'+u.pop+'</td>'; tbody.appendChild(tr); }
-}
-function renderMarket(){
-  const fee=marketFee(); const ret=Math.floor(100/(1+fee));
-  qs('#trade-fee').textContent=Math.round(fee*100)+'%';
-  qs('#trade-ret').textContent=ret.toLocaleString('pt-BR');
-}
-function renderSmith(){
-  const box=qs('#smith-techs'); box.innerHTML=''; const lvl=nivel('ferreiro');
-  for(const id in TECHS){ const t=TECHS[id]; const done=!!S.techs[id]; const card=document.createElement('div'); card.className='card';
-    card.innerHTML='<div class="row"><div><div class="name">'+t.nome+'</div><div class="sub">'+t.desc+'</div></div><div class="actions">'+(lvl<1?'<button disabled>Ferreiro N1</button>':(done?'<button disabled>Pesquisado</button>':'<button data-tech="'+id+'" class="primary">Pesquisar</button>'))+'</div></div><div class="costs"><span>Custo:</span><span>🪵 '+fmt(t.custo.wood)+'</span><span>🧱 '+fmt(t.custo.clay)+'</span><span>⛓️ '+fmt(t.custo.iron)+'</span><span>🥖 '+fmt(t.custo.food)+'</span></div>'; box.appendChild(card); }
-}
-function renderMissions(){
-  const mit=(BUILDINGS.muralha.efeito(nivel('muralha')).mitig||0); qs('#wall-mit').textContent=Math.round(mit*100); qs('#hq-lvl').textContent=nivel('hq');
-  const M=S.missao, box=qs('#mission-active');
-  if(M){ box.style.display=''; const now=Date.now(); const frac=clamp((now-M.ini)/(M.fim-M.ini),0,1); qs('#mq-bar').style.width=(frac*100)+'%'; qs('#mq-eta').textContent='Retorna em ~'+Math.ceil((M.fim-now)/1000)+'s';
-    const tb=qs('#mq-waves'); tb.innerHTML=''; M.ondas.forEach((w,i)=>{ const tr=document.createElement('tr'); tr.innerHTML='<td>'+(i+1)+'</td><td>'+fmt(w.poder)+'</td><td>'+(w.res||'—')+'</td>'; tb.appendChild(tr); });
-  }else box.style.display='none';
-}
-function renderLog(){
-  const list=qs('#mission-log'); list.innerHTML='';
-  for(const e of S.log){ const d=document.createElement('div'); d.className='card'; d.innerHTML='<div class="row"><div class="name">'+(e.sucesso?'✅ Sucesso':'❌ Falha')+'</div><span class="badge">Dif. '+e.diff+'</span><span class="badge">'+e.quando+'</span></div><div class="sub">Enviadas: '+Object.entries(e.envio).map(([t,n])=>UNITS[t].nome+'×'+n).join(', ')+'</div><div class="sub">Baixas: '+Object.entries(e.baixa).map(([t,n])=>UNITS[t].nome+'×'+n).join(', ')+'</div>'+(e.sucesso?'<div class="costs"><span>Saques:</span><span>🪵 '+fmt(e.recompensa.wood)+'</span><span>🧱 '+fmt(e.recompensa.clay)+'</span><span>⛓️ '+fmt(e.recompensa.iron)+'</span><span>🥖 '+fmt(e.recompensa.food)+'</span></div>':''); list.appendChild(d); }
-}
-function render(){ renderTop(); renderBuildings(); renderTrain(); renderArmy(); renderMarket(); renderSmith(); renderMissions(); }
+let CUR=null;
+function setPanel(open){ qs('#panelRight').classList.toggle('show', !!open); qs('#hover-tip').style.display=open?'none':'block'; }
+function openPanel(id){ CUR=id; setPanel(true); renderPanel(id); }
+function closePanel(){ CUR=null; setPanel(false); }
+qs('#btn-close').onclick=closePanel;
+qs('#btn-save').onclick=()=>{save(); toast('Salvo!')};
+qs('#btn-reset').onclick=()=>{ if(confirm('Apagar save e reiniciar?')){ localStorage.removeItem('vw-tw'); S=deepClone(DEFAULT); init3DSync(); initialVillagers(); layoutHousesVisual(); toast('Save apagado.'); renderTop(); if(CUR) renderPanel(CUR); } };
 
-/* Delegação de cliques — FIX */
-qs('#buildings').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-up]');
-  if(!btn) return;
-  const id = btn.getAttribute('data-up');
-  console.log('Upgrade click:', id);
-  try{ upgrade(id); }catch(err){ console.error(err); toast('Erro no upgrade: '+err.message, true); }
+function panelHeader(id){
+  const def=BUILDINGS[id], lvl=nivel(id);
+  qs('#panelTitle').textContent=def.nome;
+  qs('#panelInfo').textContent='Nível '+lvl+' / Máx: '+def.max + (id!=='hq'?' • Limite HQ: '+S.predios.hq:''); 
+}
+function costsStrip(cost){ const div=el('div','', 'costs'); div.append(el('span','Custo:')); div.append(el('span','🪵 '+fmt(cost.wood||0))); div.append(el('span','🧱 '+fmt(cost.clay||0))); div.append(el('span','⛓️ '+fmt(cost.iron||0))); div.append(el('span','🥖 '+fmt(cost.food||0))); div.append(el('span','⚡ Instantâneo')); return div; }
+function addUpgradeCard(box,id){
+  const lvl=nivel(id), def=BUILDINGS[id];
+  const card=el('div','', 'card');
+  const row=el('div','', 'row');
+  row.append(el('div', '<div class="name">'+(lvl===0?'Construir':'Aprimorar')+'</div>'));
+  const btn=el('button', (lvl===0?'Construir':'Aprimorar'), 'primary'); btn.dataset.up=id; row.append(btn); card.append(row); card.append(costsStrip(custoPredio(id))); box.append(card);
+}
+function addProductionInfo(box,id){ const lvl=nivel(id); if(lvl<=0) return; const pr=prodPerSec(); const which=BUILDINGS[id].producao; if(!which) return; const rate=pr[which]; const card=el('div','', 'card'); card.append(el('div','<div class="name">Produção</div><div class="muted">Atual: <b>'+(rate||0).toFixed(2)+'/s</b></div>')); box.append(card); }
+function addPopInfo(box){ const eff=efeitos(); const card=el('div','', 'card'); card.append(el('div','<div class="name">População</div><div class="muted">Aldeões: <b>'+S.villagers.length+'</b> • Cap.: <b>'+eff.popMax+'</b></div>')); box.append(card); }
+function addTrainGroup(box, types){
+  const card=el('div','', 'card'); card.append(el('div','<div class="name">Treinar</div><div class="muted">Requer aldeões livres</div>'));
+  types.forEach(id=>{ const u=UNITS[id], pred=u.predio, lvl=nivel(pred), lock=lvl<1, c=u.custo;
+    const row=el('div','', 'row'); row.append(el('div','<div><b>'+u.nome+'</b> <span class="badge">'+BUILDINGS[pred].nome+' N'+lvl+'</span></div>'));
+    const right=el('div'); if(lock){ right.append(el('button','Requer '+BUILDINGS[pred].nome+' N1')); right.lastChild.disabled=true; } else { right.append(el('input','',{type:'number'})); right.lastChild.min='1'; right.lastChild.value='1'; right.lastChild.style.width='90px'; right.lastChild.id='q-'+id; const b=el('button','Treinar',''); b.dataset.tr=id; right.append(b);} row.append(right);
+    const costs=el('div','', 'costs'); costs.append(el('span','Por unidade:')); costs.append(el('span','🪵 '+fmt(c.wood))); costs.append(el('span','🧱 '+fmt(c.clay))); costs.append(el('span','⛓️ '+fmt(c.iron))); costs.append(el('span','🥖 '+fmt(c.food))); costs.append(el('span','👥 1 aldeão')); card.append(row); card.append(costs);
+  });
+  box.append(card);
+}
+function addAssignmentInfo(box,id){ const card=el('div','', 'card'); const assigned=S.villagers.find(v=>v.assigned===id); card.append(el('div','<div class="name">Aldeão designado</div><div class="muted">'+(assigned?('ID '+assigned.id):'Nenhum')+'</div>')); box.append(card); }
+function renderPanel(id){
+  panelHeader(id);
+  const body=qs('#panelBody'); body.innerHTML='';
+  addUpgradeCard(body,id);
+  if(id==='hq'){ renderHQManager(body); }
+  if(['bosque','argila','ferro','fazenda'].includes(id)) addProductionInfo(body,id);
+  if(id==='armazem'){ const card=el('div','', 'card'); card.append(el('div','<div class="name">Capacidade</div><div class="muted">Armazém: <b>'+fmt(efeitos().capacidade)+'</b></div>')); body.append(card); }
+  if(id==='casas') addPopInfo(body);
+  if(id==='quartel') addTrainGroup(body,['spear','sword']);
+  if(id==='estabulo') addTrainGroup(body,['knight']);
+  if(id==='oficina') addTrainGroup(body,['ram','cata']);
+  addAssignmentInfo(body,id);
+}
+qs('#panelBody').addEventListener('click', (e)=>{
+  const upAll=e.target.closest('button[data-up-all],button[data-upall]'); // legacy
+  if(upAll || e.target.dataset.upAll){ upgradeAllOnce(); return; }
+  const up=e.target.closest('button[data-up]'); if(up){ upgrade(up.dataset.up); return; }
+  const tr=e.target.closest('button[data-tr]'); if(tr){ const id=tr.dataset.tr; const q=parseInt(qs('#q-'+id)?.value||'0',10); treinar(id,q); return; }
 });
-qs('#training-cards').addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-tr]'); if(!btn) return;
-  const id=btn.getAttribute('data-tr'); const qty=parseInt(qs('#q-'+id).value||'0',10); train(id, qty);
-});
 
-/* Tabs, botões e mercado */
-document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); const t=b.dataset.tab; ['unidades','missoes','mercado','ferreiro','exercito','ajuda'].forEach(id=>{ qs('#tab-'+id).style.display=(id===t)?'':'none'; }); });
-qs('#btn-save').onclick=()=>{ save(); toast('Salvo!'); };
-qs('#btn-reset').onclick=()=>{ if(confirm('Apagar save e reiniciar?')){ localStorage.removeItem('vw-tw'); S=deepClone(DEFAULT_STATE); init3DSync(); toast('Save apagado.'); render(); } };
-qs('#btn-trade').onclick=()=>{
-  const f=qs('#trade-from').value, t=qs('#trade-to').value; if(f===t) return toast('Escolha recursos diferentes.', true);
-  const amt=parseInt(qs('#trade-amt').value||'0',10); if(amt<=0) return;
-  if((S.recursos[f]||0)<amt) return toast('Quantidade insuficiente.', true);
-  const fee=marketFee(), recv=Math.floor(amt/(1+fee)); S.recursos[f]-=amt; S.recursos[t]=Math.min(storageCap(), (S.recursos[t]||0)+recv);
-  toast('Troca feita: recebeu '+recv); renderTop(); renderMarket();
-};
-qs('#btn-send-mission').onclick=()=>{
-  const diff=parseInt(qs('#mission-diff').value,10);
-  const envio={ sword:parseInt(qs('#send-sword').value||'0',10), spear:parseInt(qs('#send-spear').value||'0',10), knight:parseInt(qs('#send-knight').value||'0',10), ram:parseInt(qs('#send-ram').value||'0',10), cata:parseInt(qs('#send-cata').value||'0',10), thief:parseInt(qs('#send-thief').value||'0',10), mage:parseInt(qs('#send-mage').value||'0',10), novice:parseInt(qs('#send-novice').value||'0',10), pally:parseInt(qs('#send-pally').value||'0',10) };
-  const tot=Object.values(envio).reduce((a,b)=>a+b,0); if(tot<=0) return toast('Envie ao menos 1 unidade.', true);
-  sendMission(diff, envio); ['send-sword','send-spear','send-knight','send-ram','send-cata','send-thief','send-mage','send-novice','send-pally'].forEach(id=>qs('#'+id).value=0);
-};
-
-/* ===== 3D ===== */
-let renderer, scene, camera, raycaster, mouse; const meshes={}; const tip=qs('#hover-tip');
+/* ===== 3D Scene ===== */
+let renderer, scene, camera, raycaster, mouse, controls; const meshes={}; const tip=qs('#hover-tip');
+const buildingPos={}; // id -> THREE.Vector3
+const houseHuts=[];
 function init3D(){
-  try{
-    const el=qs('#scene3d');
-    scene=new THREE.Scene();
-    const skyTop=0xa6d2ff, skyHorizon=0x8bcf6a;
-    scene.fog=new THREE.Fog(0x88c97a, 60, 180);
-    const w=el.clientWidth,h=el.clientHeight;
-    camera=new THREE.PerspectiveCamera(44, w/h, 0.1, 500); camera.position.set(36,22,40); camera.lookAt(0,3,0);
-    renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setSize(w,h); renderer.setPixelRatio(window.devicePixelRatio||1); renderer.setClearColor(skyTop,1); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; el.appendChild(renderer.domElement);
-    const ground=new THREE.Mesh(new THREE.CylinderGeometry(34,34,1,120), new THREE.MeshLambertMaterial({color:0x8dbf6e})); ground.position.y=-0.5; ground.receiveShadow=true; scene.add(ground);
-    const ringMat=new THREE.MeshLambertMaterial({color:0xe1cfaa}); const ring=new THREE.Mesh(new THREE.TorusGeometry(13,0.8,18,80), ringMat); ring.rotation.x=Math.PI/2; ring.position.y=0.02; ring.receiveShadow=true; scene.add(ring);
-    const hemi=new THREE.HemisphereLight(0xdef6ff,0x6fa45a,0.6); scene.add(hemi);
-    const sun=new THREE.DirectionalLight(0xfff6e8,0.95); sun.position.set(50,70,30); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.left=-70; sun.shadow.camera.right=70; sun.shadow.camera.top=70; sun.shadow.camera.bottom=-70; scene.add(sun);
-    const pal=new THREE.Group(); const postGeo=new THREE.CylinderGeometry(0.34,0.5,4.4,6); const postMat=new THREE.MeshLambertMaterial({color:0x7a5a32}); const postCount=92,R=28.2;
-    for(let i=0;i<postCount;i++){ const a=i/postCount*Math.PI*2; const m=new THREE.Mesh(postGeo,postMat); m.position.set(Math.cos(a)*R,1.9,Math.sin(a)*R); m.rotation.y=-a; m.castShadow=true; m.receiveShadow=true; pal.add(m); } scene.add(pal);
-    const ordem=['hq','praca','bosque','argila','ferro','fazenda','armazem','mercado','quartel','estabulo','oficina','muralha','esconderijo','ferreiro','estatua','academia','igreja'];
-    const radius=19.6;
-    ordem.forEach((id,idx)=>{ const ang=(idx/ordem.length)*Math.PI*2 + 0.25; const x=Math.cos(ang)*radius, z=Math.sin(ang)*radius; const g=mesh(id); g.position.set(x,0,z); g.lookAt(0,0,0); g.traverse(o=>{o.castShadow=true;o.receiveShadow=true;}); scene.add(g); meshes[id]=g; });
-    raycaster=new THREE.Raycaster(); mouse=new THREE.Vector2();
-    el.addEventListener('mousemove',e=>{const rect=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-rect.left)/rect.width)*2-1; mouse.y= -((e.clientY-rect.top)/rect.height)*2+1;});
-    el.addEventListener('click',on3DClick);
-    window.addEventListener('resize',()=>{ const w2=el.clientWidth,h2=el.clientHeight; camera.aspect=w2/h2; camera.updateProjectionMatrix(); renderer.setSize(w2,h2); });
-    animate3D();
-  }catch(e){ qs('#three-warning').style.display='block'; console.error(e); toast('Erro 3D: '+e.message, true); }
+  const el=qs('#scene3d');
+  scene=new THREE.Scene();
+  scene.fog=new THREE.Fog(0x9fd3ff,200,520);
+  const w=el.clientWidth,h=el.clientHeight;
+  camera=new THREE.PerspectiveCamera(55,w/h,0.1,1500);
+  camera.position.set(150,94,140); camera.lookAt(0,0,0);
+  renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(w,h); renderer.setPixelRatio(window.devicePixelRatio||1.25);
+  renderer.setClearColor(0xa6d2ff,1);
+  renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  el.appendChild(renderer.domElement);
+  controls=new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0,0,0); controls.enableDamping=true; controls.dampingFactor=0.08; controls.enablePan=true;
+  controls.minDistance=40; controls.maxDistance=480; controls.maxPolarAngle=Math.PI*0.495;
+  // Ground / paths / pond
+  const ground=new THREE.Mesh(new THREE.CylinderGeometry(MAP_RADIUS,MAP_RADIUS,1,180), new THREE.MeshStandardMaterial({color:0x8dbf6e, roughness:0.9, metalness:0.0})); ground.position.y=-0.5; ground.receiveShadow=true; scene.add(ground);
+  const pathMat=new THREE.MeshStandardMaterial({color:0xd9c79c, roughness:0.8, metalness:0.0});
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(34,1.3,24,160), pathMat); ring.rotation.x=Math.PI/2; ring.position.y=0.05; ring.receiveShadow=true; scene.add(ring);
+  for(let i=0;i<8;i++){ const ang=(i/8)*Math.PI*2; const len=90; const geo=new THREE.BoxGeometry(len,0.5,2.5); const m=new THREE.Mesh(geo,pathMat); m.position.set(Math.cos(ang)*len/2,0.25,Math.sin(ang)*len/2); m.rotation.y=-ang; m.castShadow=false; m.receiveShadow=true; scene.add(m); }
+  const pond=new THREE.Mesh(new THREE.CylinderGeometry(10,10,0.2,40), new THREE.MeshPhysicalMaterial({color:0x6db7ff, metalness:0.0, roughness:0.2, transparent:true, opacity:0.9, clearcoat:1})); pond.position.set(-58,-0.2,54); pond.receiveShadow=true; scene.add(pond);
+  addForestInstanced(); addRocksInstanced();
+  // Lighting
+  const hemi=new THREE.HemisphereLight(0xdef6ff,0x6fa45a,0.65); scene.add(hemi);
+  const sun=new THREE.DirectionalLight(0xfff6e8,0.95); sun.position.set(200,220,120); sun.castShadow=true; sun.shadow.mapSize.set(4096,4096); sun.shadow.camera.left=-360; sun.shadow.camera.right=360; sun.shadow.camera.top=360; sun.shadow.camera.bottom=-360; scene.add(sun);
+  // Buildings
+  placeBuildings();
+  // Events
+  raycaster=new THREE.Raycaster(); mouse=new THREE.Vector2();
+  el.addEventListener('mousemove',e=>{const rect=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-rect.left)/rect.width)*2-1; mouse.y= -((e.clientY-rect.top)/rect.height)*2+1;});
+  el.addEventListener('click',on3DClick);
+  window.addEventListener('resize',()=>{const w2=el.clientWidth,h2=el.clientHeight; camera.aspect=w2/h2; camera.updateProjectionMatrix(); renderer.setSize(w2,h2);});
+  animate3D();
 }
-function roof(r,h,c){ const m=new THREE.Mesh(new THREE.ConeGeometry(r,h,4), new THREE.MeshLambertMaterial({color:c})); m.rotation.y=Math.PI/4; return m; }
+function addForestInstanced(){
+  const trunkGeo=new THREE.CylinderGeometry(0.45,0.6,3.8,6);
+  const leafGeo=new THREE.ConeGeometry(1.9,3.6,9);
+  const trunkMat=new THREE.MeshStandardMaterial({color:0x6d4b2a, roughness:0.9});
+  const leafMat=new THREE.MeshStandardMaterial({color:0x2b7a3f, roughness:0.7});
+  const count=420;
+  const trunkInst=new THREE.InstancedMesh(trunkGeo, trunkMat, count);
+  const leafInst=new THREE.InstancedMesh(leafGeo, leafMat, count);
+  const m4=new THREE.Matrix4();
+  for(let i=0;i<count;i++){
+    const r=rand(36,MAP_RADIUS-10), ang=rand(0,Math.PI*2);
+    const x=Math.cos(ang)*r, z=Math.sin(ang)*r;
+    const y=1.9;
+    m4.makeTranslation(x,y,z);
+    trunkInst.setMatrixAt(i, m4);
+    const scale=rand(0.85,1.25);
+    m4.makeTranslation(x,y+2.2,z).scale(new THREE.Vector3(scale,scale,scale));
+    leafInst.setMatrixAt(i, m4);
+  }
+  trunkInst.castShadow=true; trunkInst.receiveShadow=true;
+  leafInst.castShadow=true; leafInst.receiveShadow=true;
+  scene.add(trunkInst); scene.add(leafInst);
+}
+function addRocksInstanced(){
+  const rockGeo=new THREE.DodecahedronGeometry(1.0);
+  const rockMat=new THREE.MeshStandardMaterial({color:0xa8a8a8, roughness:0.9});
+  const count=70; const inst=new THREE.InstancedMesh(rockGeo, rockMat, count); const m4=new THREE.Matrix4();
+  for(let i=0;i<count;i++){
+    const r=rand(22,MAP_RADIUS-8), ang=rand(0,Math.PI*2);
+    const x=Math.cos(ang)*r, z=Math.sin(ang)*r; const s=rand(0.6,1.8);
+    m4.compose(new THREE.Vector3(x,0.8,z), new THREE.Quaternion(), new THREE.Vector3(s,s,s));
+    inst.setMatrixAt(i,m4);
+  }
+  inst.castShadow=true; inst.receiveShadow=true; scene.add(inst);
+}
+function roof(r,h,c){ const m=new THREE.Mesh(new THREE.ConeGeometry(r,h,4), new THREE.MeshStandardMaterial({color:c, roughness:0.85})); m.rotation.y=Math.PI/4; return m; }
 function scaleByLevel(g,l){ const s=0.95 + l*0.08; g.scale.set(s,0.95+l*0.12,s); }
-function mesh(id){
+function meshPredio(id){
   const g=new THREE.Group(); const lvl=nivel(id);
-  const base=new THREE.Mesh(new THREE.CylinderGeometry(2.8,2.8,0.35,16), new THREE.MeshLambertMaterial({color:0xd9c79c})); base.position.y=0.175; g.add(base);
-  const wood=0x835634, stone=0x9a9a9a, roofC=0xbb6b3b, thatch=0xd7c068;
-  let core;
+  const wood=0x835634, stone=0x9a9a9a, roofC=0xbb6b3b, thatch=0xd7c068, fancy=0xcbb37c;
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(3.4,3.4,0.35,18), new THREE.MeshStandardMaterial({color:0xd9c79c, roughness:0.85})); base.position.y=0.175; g.add(base);
   switch(id){
-    case 'hq': { const b1=new THREE.Mesh(new THREE.BoxGeometry(3.4,2.2,2.8), new THREE.MeshLambertMaterial({color:stone})); b1.position.y=1.4; g.add(b1); const tower=new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,3.6,10), new THREE.MeshLambertMaterial({color:0xbdbdbd})); tower.position.set(1.2,2.4,0.3); g.add(tower); const r=roof(2.2,1.1,roofC); r.position.y=2.6; g.add(r);} break;
-    case 'quartel': core=new THREE.Mesh(new THREE.BoxGeometry(3.6,1.6,2.2), new THREE.MeshLambertMaterial({color:stone})); core.position.y=1.2; g.add(core); const rf=roof(2.1,0.9,thatch); rf.position.y=1.9; g.add(rf); break;
-    case 'estabulo': core=new THREE.Mesh(new THREE.BoxGeometry(3.4,1.4,2.2), new THREE.MeshLambertMaterial({color:0xcaa06a})); core.position.y=1.1; g.add(core); break;
-    case 'oficina': core=new THREE.Mesh(new THREE.BoxGeometry(3.0,1.4,2.4), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.2; g.add(core); break;
-    case 'ferreiro': core=new THREE.Mesh(new THREE.BoxGeometry(2.6,1.6,2.0), new THREE.MeshLambertMaterial({color:0x9e9e9e})); core.position.y=1.2; g.add(core); break;
-    case 'mercado': core=new THREE.Mesh(new THREE.BoxGeometry(2.8,1.2,2.0), new THREE.MeshLambertMaterial({color:0xd9c79c})); core.position.y=1.0; g.add(core); break;
-    case 'bosque': core=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.6,2.4), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.1; g.add(core); const rr=roof(1.9,1.0,thatch); rr.position.y=1.9; g.add(rr); break;
-    case 'argila': core=new THREE.Mesh(new THREE.ConeGeometry(1.7,1.5,8), new THREE.MeshLambertMaterial({color:0xb5653e})); core.position.y=1.2; g.add(core); break;
-    case 'ferro': core=new THREE.Mesh(new THREE.ConeGeometry(1.7,1.8,6), new THREE.MeshLambertMaterial({color:0x6d6d75})); core.position.y=1.3; g.add(core); break;
-    case 'fazenda': core=new THREE.Mesh(new THREE.BoxGeometry(2.8,0.6,2.8), new THREE.MeshLambertMaterial({color:0xc8d87a})); core.position.y=0.6; g.add(core); break;
-    case 'armazem': core=new THREE.Mesh(new THREE.BoxGeometry(3.4,1.6,2.6), new THREE.MeshLambertMaterial({color:0xcab389})); core.position.y=1.1; g.add(core); break;
-    case 'muralha': core=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.2,2.6,8), new THREE.MeshLambertMaterial({color:0x9a9a9a})); core.position.y=1.6; g.add(core); break;
-    case 'esconderijo': core=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.2,1.8), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.0; g.add(core); break;
-    case 'praca': core=new THREE.Mesh(new THREE.CylinderGeometry(2.0,2.0,0.6,14), new THREE.MeshLambertMaterial({color:0xcdbb96})); core.position.y=0.8; g.add(core); break;
-    case 'estatua': core=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.9,2.2,8), new THREE.MeshLambertMaterial({color:0xbdbdbd})); core.position.y=1.4; g.add(core); break;
-    case 'academia': core=new THREE.Mesh(new THREE.BoxGeometry(3.0,1.6,2.2), new THREE.MeshLambertMaterial({color:0x8aa3c2})); core.position.y=1.2; g.add(core); break;
-    case 'igreja': core=new THREE.Mesh(new THREE.BoxGeometry(2.6,1.8,2.0), new THREE.MeshLambertMaterial({color:0xd6d2b0})); core.position.y=1.3; g.add(core); const cr=roof(1.6,0.8,0xc49a6c); cr.position.y=2.0; g.add(cr); break;
+    case 'hq':{
+      const keep=new THREE.Mesh(new THREE.BoxGeometry(7.6*HQ_SCALE,5.0*HQ_SCALE,6.2*HQ_SCALE), new THREE.MeshStandardMaterial({color:0xbfbfbf, roughness:0.9})); keep.position.y=2.7*HQ_SCALE; g.add(keep);
+      const t1=new THREE.Mesh(new THREE.CylinderGeometry(1.2*HQ_SCALE,1.2*HQ_SCALE,6.6*HQ_SCALE,12), new THREE.MeshStandardMaterial({color:0xd0d0d0})); t1.position.set(3.2*HQ_SCALE,3.5*HQ_SCALE,2.2*HQ_SCALE); g.add(t1);
+      const t2=t1.clone(); t2.position.set(-3.1*HQ_SCALE,3.5*HQ_SCALE,-2.0*HQ_SCALE); g.add(t2);
+      const roofK=roof(3.8*HQ_SCALE,1.2*HQ_SCALE,0xc49a6c); roofK.position.y=4.6*HQ_SCALE; g.add(roofK);
+      const plaza=new THREE.Mesh(new THREE.CylinderGeometry(7.8*HQ_SCALE,7.8*HQ_SCALE,0.2,28), new THREE.MeshStandardMaterial({color:fancy, roughness:0.8})); plaza.position.y=0.12; g.add(plaza);
+      const flag=new THREE.Mesh(new THREE.PlaneGeometry(1.6*HQ_SCALE,1.0*HQ_SCALE,6,1), new THREE.MeshStandardMaterial({color:0xdeb841, side:THREE.DoubleSide, roughness:0.5})); flag.position.set(0,6.4*HQ_SCALE,0); flag.rotation.y=Math.PI/4; flag.userData.flag=true; g.add(flag);
+    }break;
+    case 'casas':{
+      const core=new THREE.Mesh(new THREE.BoxGeometry(4.0,1.7,3.2), new THREE.MeshStandardMaterial({color:0xcaa06a})); core.position.y=1.2; g.add(core);
+      const rf=roof(2.5,1.0,0xc77a3b); rf.position.y=2.1; g.add(rf);
+    }break;
+    case 'quartel':{
+      const core=new THREE.Mesh(new THREE.BoxGeometry(3.8,1.7,2.4), new THREE.MeshStandardMaterial({color:stone})); core.position.y=1.2; g.add(core);
+      const rf=roof(2.2,0.9,thatch); rf.position.y=2.0; g.add(rf);
+    }break;
+    case 'estabulo':{
+      const core=new THREE.Mesh(new THREE.BoxGeometry(3.6,1.5,2.4), new THREE.MeshStandardMaterial({color:0xcaa06a})); core.position.y=1.1; g.add(core);
+    }break;
+    case 'oficina':{
+      const core=new THREE.Mesh(new THREE.BoxGeometry(3.4,1.5,2.8), new THREE.MeshStandardMaterial({color:wood})); core.position.y=1.2; g.add(core);
+    }break;
+    case 'ferreiro':{
+      const core=new THREE.Mesh(new THREE.BoxGeometry(2.8,1.6,2.1), new THREE.MeshStandardMaterial({color:0x9e9e9e})); core.position.y=1.2; g.add(core);
+      const chimney=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.35,1.2,8), new THREE.MeshStandardMaterial({color:0x777777})); chimney.position.set(1.0,1.8,0.4); g.add(chimney);
+    }break;
+    case 'mercado':{
+      const core=new THREE.Mesh(new THREE.BoxGeometry(3.0,1.3,2.2), new THREE.MeshStandardMaterial({color:0xd9c79c})); core.position.y=1.0; g.add(core);
+    }break;
+    case 'bosque':{
+      const core=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.6,2.4), new THREE.MeshStandardMaterial({color:wood})); core.position.y=1.1; g.add(core);
+      const rf=roof(1.9,1.0,thatch); rf.position.y=1.9; g.add(rf);
+    }break;
+    case 'argila':{
+      const core=new THREE.Mesh(new THREE.ConeGeometry(1.8,1.7,9), new THREE.MeshStandardMaterial({color:0xb5653e})); core.position.y=1.3; g.add(core);
+    }break;
+    case 'ferro':{
+      const core=new THREE.Mesh(new THREE.ConeGeometry(1.8,2.0,7), new THREE.MeshStandardMaterial({color:0x6d6d75})); core.position.y=1.4; g.add(core);
+    }break;
+    case 'fazenda':{
+      const core=new THREE.Mesh(new THREE.BoxGeometry(3.4,0.6,3.4), new THREE.MeshStandardMaterial({color:0xc8d87a})); core.position.y=0.6; g.add(core);
+      const fldMat=new THREE.MeshStandardMaterial({color:0xdabf7a, roughness:0.9});
+      for(let i=0;i<6;i++){ const a=(i/6)*Math.PI*2; const r=6.5; const m=new THREE.Mesh(new THREE.BoxGeometry(3.8,0.1,2.2), fldMat); m.position.set(Math.cos(a)*r,0.1,Math.sin(a)*r); m.rotation.y=a; g.add(m); }
+    }break;
+    case 'armazem':{
+      const core=new THREE.Mesh(new THREE.BoxGeometry(4.2,1.7,3.4), new THREE.MeshStandardMaterial({color:0xcab389})); core.position.y=1.1; g.add(core);
+    }break;
+    case 'praca':{
+      const core=new THREE.Mesh(new THREE.CylinderGeometry(2.6,2.6,0.6,16), new THREE.MeshStandardMaterial({color:0xcdbb96})); core.position.y=0.8; g.add(core);
+    }break;
   }
   scaleByLevel(g,lvl); g.userData.id=id; return g;
 }
+function placeBuildings(){
+  const center=new THREE.Vector3(0,0,0);
+  addBuilding('hq', center);
+  const ring1=52, ring2=88;
+  const order1=['casas','armazem','mercado','ferreiro','quartel','estabulo','oficina','praca'];
+  const order2=['bosque','argila','ferro','fazenda'];
+  order1.forEach((id,i)=>{
+    const a=(i/order1.length)*Math.PI*2 + 0.3;
+    const pos=new THREE.Vector3(Math.cos(a)*ring1,0,Math.sin(a)*ring1);
+    addBuilding(id,pos);
+    addPath(center,pos);
+  });
+  order2.forEach((id,i)=>{
+    const a=(i/order2.length)*Math.PI*2 + 0.15;
+    const pos=new THREE.Vector3(Math.cos(a)*ring2,0,Math.sin(a)*ring2);
+    addBuilding(id,pos);
+    addPath(buildingPos['mercado']||center,pos);
+  });
+  layoutHousesVisual();
+}
+function addPath(a,b){
+  const len=a.distanceTo(b);
+  const geo=new THREE.BoxGeometry(len,0.35,2.6);
+  const mat=new THREE.MeshStandardMaterial({color:0xd9c79c, roughness:0.85});
+  const m=new THREE.Mesh(geo,mat); m.position.copy(a).add(b).multiplyScalar(0.5); m.position.y=0.18;
+  m.rotation.y=Math.atan2(b.x-a.x, b.z-a.z);
+  m.castShadow=false; m.receiveShadow=true;
+  scene.add(m);
+}
+function addBuilding(id, pos){
+  buildingPos[id]=pos.clone();
+  const g=meshPredio(id);
+  g.position.copy(pos);
+  g.lookAt(0,0,0);
+  g.traverse(o=>{o.castShadow=true;o.receiveShadow=true});
+  scene.add(g);
+  meshes[id]=g;
+}
+function layoutHousesVisual(){
+  houseHuts.forEach(m=>scene.remove(m));
+  houseHuts.length=0;
+  const lvl=nivel('casas'), pos=buildingPos['casas']; if(!pos) return;
+  const n=Math.min(14, Math.max(4, Math.floor(lvl/2)+3));
+  for(let i=0;i<n;i++){
+    const a=(i/n)*Math.PI*2;
+    const r=10+ (i%2)*3;
+    const x=pos.x+Math.cos(a)*r, z=pos.z+Math.sin(a)*r;
+    const hut=new THREE.Group();
+    const b=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.2,2.0), new THREE.MeshStandardMaterial({color:0xcaa06a})); b.position.y=0.9; hut.add(b);
+    const rf=roof(1.4,0.7,0xa9642a); rf.position.y=1.6; hut.add(rf);
+    hut.position.set(x,0,z);
+    scene.add(hut); houseHuts.push(hut);
+  }
+}
 function updateMesh(id){ const g=meshes[id]; if(!g) return; scaleByLevel(g, nivel(id)); }
-function animate3D(){ requestAnimationFrame(animate3D); if(!renderer) return; raycaster.setFromCamera(mouse,camera); const hits=raycaster.intersectObjects(Object.values(meshes),true);
-  if(hits.length>0){ let p=hits[0].object; while(p && !p.userData.id) p=p.parent; if(p && p.userData.id){ tip.style.display='block'; tip.textContent=BUILDINGS[p.userData.id].nome+' — N '+nivel(p.userData.id); } } else { tip.style.display='none' }
+
+function animate3D(){ requestAnimationFrame(animate3D); if(!renderer) return; controls.update(); raycaster.setFromCamera(mouse,camera); const hits=raycaster.intersectObjects(Object.values(meshes),true);
+  if(hits.length>0){ let p=hits[0].object; while(p && !p.userData.id) p=p.parent; if(p && p.userData.id){ tip.style.display='block'; tip.textContent=BUILDINGS[p.userData.id].nome+' — N '+nivel(p.userData.id)+' (clique)'; } } else { if(!CUR) tip.style.display='block'; }
+  const hq=meshes['hq']; if(hq){ hq.traverse(o=>{ if(o.userData && o.userData.flag){ o.rotation.z = Math.sin(performance.now()*0.002)*0.1; } }); }
   renderer.render(scene,camera);
 }
 function on3DClick(e){
   const rect=renderer.domElement.getBoundingClientRect(); const mx=((e.clientX-rect.left)/rect.width)*2-1; const my= -((e.clientY-rect.top)/rect.height)*2+1;
   raycaster.setFromCamera({x:mx,y:my}, camera); const hits=raycaster.intersectObjects(Object.values(meshes),true);
-  if(hits.length>0){ let p=hits[0].object; while(p && !p.userData.id) p=p.parent; if(p && p.userData.id){ const id=p.userData.id; const card=document.querySelector('[data-card=\"'+id+'\"]'); if(card){ card.scrollIntoView({behavior:'smooth',block:'center'}); card.style.outline='3px solid #2f7a3e'; setTimeout(()=>card.style.outline='',1200) } } }
+  if(hits.length>0){ let p=hits[0].object; while(p && !p.userData.id) p=p.parent; if(p && p.userData.id){ openPanel(p.userData.id); } }
 }
 function init3DSync(){ Object.keys(meshes).forEach(updateMesh) }
 
-/* Boot */
+/* ===== Aldeões ===== */
+let villagerId=1;
+function villagerMesh(color=0x9ec1db){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.6,1.6,8), new THREE.MeshStandardMaterial({color, roughness:0.8})); body.position.y=0.8; g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.35,12,12), new THREE.MeshStandardMaterial({color:0xffddb1, roughness:0.4})); head.position.y=1.7; g.add(head);
+  g.castShadow=true; g.receiveShadow=true;
+  return g;
+}
+function equipWeapon(g,type){
+  g.children = g.children.filter(ch=>{ if(ch.userData && ch.userData.weapon) { g.remove(ch); return false } return true});
+  let m=null;
+  if(type==='sword'){ m=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.8,0.1), new THREE.MeshStandardMaterial({color:0xc0c0c0, roughness:0.3})); m.position.set(0.35,1.1,0); }
+  if(type==='spear'){ m=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.3,6), new THREE.MeshStandardMaterial({color:0x8b5a2b})); const tip=new THREE.Mesh(new THREE.ConeGeometry(0.12,0.25,6), new THREE.MeshStandardMaterial({color:0xc0c0c0})); tip.position.y=0.65; m.add(tip); m.position.set(0.4,1.0,0); }
+  if(type==='knight'){ m=new THREE.Mesh(new THREE.BoxGeometry(0.45,0.45,0.1), new THREE.MeshStandardMaterial({color:0x606060})); m.position.set(0,1.3,0); }
+  if(type==='ram'){ m=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.3,0.3), new THREE.MeshStandardMaterial({color:0x7a4a1f})); m.position.set(-0.4,0.9,0); }
+  if(type==='cata'){ m=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.2,0.4), new THREE.MeshStandardMaterial({color:0x6c4418})); m.position.set(-0.4,1.0,0); }
+  if(m){ m.userData={weapon:true}; g.add(m); }
+}
+function setVillagerRole(v, role){
+  v.role=role;
+  const colors={worker:0x9ec1db, sword:0xaa3333, spear:0x2255aa, knight:0x777777, ram:0x8b5a2b, cata:0x6c4418};
+  v.mesh.children[0].material.color.setHex(colors[role]||0x9ec1db);
+  if(role==='worker') equipWeapon(v.mesh,null); else equipWeapon(v.mesh,role);
+}
+function spawnVillager(pos, role='worker', assigned=null){
+  const mesh=villagerMesh();
+  mesh.position.copy(pos.clone().add(new THREE.Vector3(rand(-2,2),0,rand(-2,2))));
+  scene.add(mesh);
+  const v={id:villagerId++, mesh, role:'worker', assigned, speed:rand(1.4,1.9), target:null, wait:0, bob:rand(0,Math.PI*2)};
+  setVillagerRole(v, role||'worker');
+  S.villagers.push(v);
+  return v;
+}
+function spawnNewVillagers(q){
+  const cap=popCap();
+  for(let i=0;i<q;i++){
+    if(S.villagers.length>=cap) break;
+    const pos=buildingPos['casas']||new THREE.Vector3(0,0,0);
+    spawnVillager(pos,'worker', null);
+  }
+  ensureAssignments();
+}
+function initialVillagers(){
+  if(S.villagers.length===0){
+    spawnVillager(buildingPos['hq']||new THREE.Vector3(), 'worker', 'hq');
+    spawnVillager(buildingPos['armazem']||new THREE.Vector3(), 'worker', 'armazem');
+    spawnVillager(buildingPos['fazenda']||new THREE.Vector3(), 'worker', 'fazenda');
+  }
+  ensureAssignments();
+}
+function ensureAssignments(){
+  Object.keys(BUILDINGS).forEach(id=>{
+    if(nivel(id)>0 && id!=='casas'){
+      const already=S.villagers.find(v=>v.assigned===id);
+      if(!already){
+        const free=S.villagers.find(v=>v.role==='worker' && !v.assigned);
+        if(free) free.assigned=id;
+      }
+    }
+  });
+}
+function randomDestination(v){
+  const keys=Object.keys(buildingPos);
+  const k=keys[Math.floor(Math.random()*keys.length)];
+  const p=buildingPos[k].clone(); p.x+=rand(-6,6); p.z+=rand(-6,6); return p;
+}
+function updateVillagers(dt){
+  const bounds=MAP_RADIUS-6;
+  for(const v of S.villagers){
+    v.bob+=dt*2; v.mesh.position.y = 0 + Math.sin(v.bob)*0.04;
+    if(v.wait>0){ v.wait-=dt; continue; }
+    if(!v.target || v.mesh.position.distanceTo(v.target)<1.2){
+      v.target=randomDestination(v);
+      v.wait=rand(0.2,1.0);
+    }
+    const dir=v.target.clone().sub(v.mesh.position); dir.y=0; const d=dir.length(); if(d>0.001){ dir.normalize(); v.mesh.position.addScaledVector(dir, v.speed*dt); v.mesh.lookAt(v.mesh.position.clone().add(dir)); }
+    const dR=Math.hypot(v.mesh.position.x, v.mesh.position.z);
+    if(dR>bounds){ const scl=bounds/dR; v.mesh.position.x*=scl; v.mesh.position.z*=scl; v.target=null; }
+  }
+}
+
+/* ===== Boot ===== */
 window.addEventListener('beforeunload', save);
-init3D(); render(); requestAnimationFrame(tick);
+attachSpeedUI();
+init3D(); initialVillagers(); renderTop(); layoutHousesVisual(); requestAnimationFrame(tick);
 </script>
 </body>
 </html>
