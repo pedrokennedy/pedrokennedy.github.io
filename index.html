@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Village Wars — 3D Isometric Camera</title>
+<title>Village Wars — 3D Isometric Camera (Fix)</title>
 <style>
   :root{
     --bg:#e9dec1;--panel:#f7f0db;--wood:#8b5a2b;--wood-dark:#5d3b1a;--ink:#3a2a17;
@@ -169,7 +169,37 @@
 <!-- Three.js -->
 <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
 <script>
-/* ========== Utilities & Core ========== */
+/* ========== Utilities & Core (formatTime patched to avoid template literals) ========== */
+function pad2(n){return (n<10?'0':'')+n;}
+function formatTime(ms){
+  var s=Math.max(0,Math.ceil(ms/1000));
+  var h=Math.floor(s/3600); s%=3600;
+  var m=Math.floor(s/60); s%=60;
+  return pad2(h)+':'+pad2(m)+':'+pad2(s);
+}
+const fmt=n=>Math.floor(n).toLocaleString();
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function percent(n){return Math.round(n*100)}; const deepClone=o=>JSON.parse(JSON.stringify(o));
+
+const BUILDINGS={
+  townCenter:{name:'Town Center',desc:'Speeds up construction.', baseCost:{wood:200,clay:200,iron:150,food:0}, costMult:1.55, baseTime:15000, effectLvl:(lvl)=>({buildSpeed:1+0.08*lvl})},
+  townPlaza:{name:'Town Plaza',desc:'Send missions. Improves rewards and mission speed.', baseCost:{wood:150,clay:150,iron:120,food:50}, costMult:1.5, baseTime:12000, effectLvl:(lvl)=>({rewardBonus:0.06*lvl, missionSpeed:0.03*lvl})},
+  lumbermill:{name:'Lumbermill',desc:'Generates wood.', baseCost:{wood:60,clay:50,iron:40,food:0}, costMult:1.45, baseTime:8000, production:'wood'},
+  clayMine:{name:'Clay Mine',desc:'Generates clay.', baseCost:{wood:50,clay:60,iron:40,food:0}, costMult:1.45, baseTime:8000, production:'clay'},
+  ironMine:{name:'Iron Mine',desc:'Generates iron.', baseCost:{wood:50,clay:50,iron:60,food:0}, costMult:1.45, baseTime:8000, production:'iron'},
+  farm:{name:'Farm',desc:'Generates food.', baseCost:{wood:70,clay:40,iron:40,food:0}, costMult:1.45, baseTime:8000, production:'food'},
+  houses:{name:'Houses',desc:'Increase population cap.', baseCost:{wood:80,clay:60,iron:60,food:0}, costMult:1.5, baseTime:9000, effectLvl:(lvl)=>({popCap:15*lvl})},
+  market:{name:'Market',desc:'Trade resources; higher level reduces fee.', baseCost:{wood:120,clay:120,iron:120,food:50}, costMult:1.5, baseTime:10000, effectLvl:(lvl)=>({fee:Math.max(0.2-0.015*lvl,0.05)})},
+  barracks:{name:'Barracks',desc:'Train infantry; speeds training.', baseCost:{wood:100,clay:70,iron:50,food:30}, costMult:1.5, baseTime:11000, effectLvl:(lvl)=>({trainSpeedInf:1+0.07*lvl})},
+  archerCamp:{name:'Archer Camp',desc:'Train archers; speeds training.', baseCost:{wood:120,clay:60,iron:80,food:30}, costMult:1.5, baseTime:11000, effectLvl:(lvl)=>({trainSpeedArc:1+0.07*lvl})},
+  stable:{name:'Stable',desc:'Train cavalry; speeds training.', baseCost:{wood:150,clay:120,iron:150,food:50}, costMult:1.5, baseTime:13000, effectLvl:(lvl)=>({trainSpeedCav:1+0.07*lvl})},
+  wall:{name:'Wall',desc:'Reduces mission casualties.', baseCost:{wood:120,clay:160,iron:200,food:0}, costMult:1.55, baseTime:14000, effectLvl:(lvl)=>({mitigation:Math.min(0.02*lvl,0.5)})}
+};
+const UNITS={infantry:{name:'Infantry',atk:5,hp:10,pop:1,time:9000,cost:{wood:50,clay:30,iron:20,food:10},building:'barracks'},archer:{name:'Archer',atk:7,hp:8,pop:1,time:11000,cost:{wood:80,clay:20,iron:40,food:10},building:'archerCamp'},cavalry:{name:'Cavalry',atk:15,hp:20,pop:3,time:16000,cost:{wood:100,clay:80,iron:120,food:30},building:'stable'}};
+const BASE_PROD={wood:1.2,clay:1.1,iron:1.0,food:0.9};
+const DEFAULT_STATE={t0:Date.now(),timePlayedMs:0,resources:{wood:200,clay:200,iron:200,food:100},buildings:Object.fromEntries(Object.keys(BUILDINGS).map(k=>[k,1])),construction:null,units:{infantry:0,archer:0,cavalry:0},training:[],mission:null,missionLog:[],reservedPop:0};
+let state=loadState(); function loadState(){try{const raw=localStorage.getItem('vw-save-3d-iso-fix');if(raw){const s=JSON.parse(raw);return {...DEFAULT_STATE,...s}}}catch(e){}return deepClone(DEFAULT_STATE)}; function saveState(){localStorage.setItem('vw-save-3d-iso-fix',JSON.stringify(state))}
+
 const fmt=n=>Math.floor(n).toLocaleString();
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function formatTime(ms){let s=Math.max(0,Math.ceil(ms/1000));const h=Math.floor(s/3600);s%=3600;const m=Math.floor(s/60);s%=60;return \`\${String(h).padStart(2,'0')}:\${String(m).padStart(2,'0')}:\${String(s).padStart(2,'0')}\`;}
