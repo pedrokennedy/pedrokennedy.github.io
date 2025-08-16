@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Village Wars — 3D Isometric (Clean v2)</title>
+<title>Village Wars — Cinematic 3D (Perspective)</title>
 <style>
   :root{
     --bg:#e9dec1;--panel:#f7f0db;--wood:#8b5a2b;--wood-dark:#5d3b1a;--ink:#3a2a17;
@@ -38,7 +38,12 @@
   .tabs{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
   .tabs button{background:linear-gradient(180deg,#a17b4d,#7a5a32);border:2px solid var(--wood-dark)}
   .tabs button.active{background:linear-gradient(180deg,#3e8c4b,#2f7a3e);border-color:#20582a}
-  #scene3d{height:520px;border:3px solid var(--wood);border-radius:12px;background:linear-gradient(#9ed0ff 0 62%,#9fcf7a 62%);box-shadow:inset 0 2px #fff,0 3px 0 0 #d7c8a8;position:relative}
+  #scene3d{height:520px;border:3px solid var(--wood);border-radius:12px;position:relative;overflow:hidden}
+  #scene3d::after{
+    content:"";pointer-events:none;position:absolute;inset:-20%;
+    background:radial-gradient(120% 80% at 50% 30%, rgba(255,255,255,0.0) 40%, rgba(0,0,0,.15) 85%);
+    mix-blend-mode:multiply;
+  }
   #hover-tip{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.92);border:1px solid var(--border);padding:4px 8px;border-radius:8px;font-size:12px;display:none}
   input[type="number"],select{background:#faf2db;border:1px solid var(--border);border-radius:8px;padding:7px 8px}
 </style>
@@ -66,7 +71,7 @@
   <div class="wrap">
     <section class="panel">
       <h2>Village View</h2>
-      <div class="sub">Locked 3D camera at a cinematic angle. Click a building to focus its card.</div>
+      <div class="sub">Locked 3D camera at a cinematic angle (perspective, with sky, shadows, palisade gates). Click a building to focus its card.</div>
       <div id="scene3d"><div id="hover-tip"></div></div>
       <div id="three-warning" class="sub" style="display:none;margin-top:8px;color:#a32a2a">
         Couldn’t load WebGL/Three.js. Please open with internet enabled or allow WebGL.
@@ -166,11 +171,10 @@
   </div>
 </main>
 
-<!-- Module script -->
 <script type="module">
 import * as THREE from "https://unpkg.com/three@0.158.0/build/three.module.js";
 
-/* ===== Helpers ===== */
+/* ===== Helpers & Data ===== */
 const fmt = (n)=>Math.floor(n).toLocaleString();
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
 function pad2(n){return (n<10?'0':'')+n}
@@ -178,7 +182,6 @@ function formatTime(ms){let s=Math.max(0,Math.ceil(ms/1000));let h=Math.floor(s/
 const deepClone = (o)=>JSON.parse(JSON.stringify(o));
 const percent=(n)=>Math.round(n*100);
 
-/* ===== Game Data ===== */
 const BUILDINGS = {
   townCenter:{name:'Town Center',desc:'Speeds up construction.', baseCost:{wood:200,clay:200,iron:150,food:0}, costMult:1.55, baseTime:15000, effectLvl:(lvl)=>({buildSpeed:1+0.08*lvl})},
   townPlaza:{name:'Town Plaza',desc:'Send missions. Improves rewards and mission speed.', baseCost:{wood:150,clay:150,iron:120,food:50}, costMult:1.5, baseTime:12000, effectLvl:(lvl)=>({rewardBonus:0.06*lvl, missionSpeed:0.03*lvl})},
@@ -210,10 +213,10 @@ const DEFAULT_STATE = {
   reservedPop:0,
 };
 let state = loadState();
-function loadState(){ try{ const raw=localStorage.getItem('vw-save-iso-clean2'); if(raw){ const s=JSON.parse(raw); return {...DEFAULT_STATE, ...s}; } }catch(e){} return deepClone(DEFAULT_STATE) }
-function saveState(){ localStorage.setItem('vw-save-iso-clean2', JSON.stringify(state)) }
+function loadState(){ try{ const raw=localStorage.getItem('vw-save-iso-persp'); if(raw){ const s=JSON.parse(raw); return {...DEFAULT_STATE, ...s}; } }catch(e){} return deepClone(DEFAULT_STATE) }
+function saveState(){ localStorage.setItem('vw-save-iso-persp', JSON.stringify(state)) }
 
-/* ===== Calculations ===== */
+/* ===== Calculations & UI (same as before) ===== */
 const buildingLevel = (id)=>state.buildings[id]||0;
 function buildingEffects(){
   const eff={buildSpeed:1,rewardBonus:0,missionSpeed:0,mitigation:0,fee:0.2,trainSpeedInf:1,trainSpeedArc:1,trainSpeedCav:1,popCap:0};
@@ -255,7 +258,18 @@ const freePopulation = ()=>Math.max(0,totalPopulationCap()-idlePopulation());
 const unitCost=(t)=>deepClone(UNITS[t].cost);
 function unitTimeMs(t){ const u=UNITS[t], eff=buildingEffects(); const mult = t==='infantry'?eff.trainSpeedInf : t==='archer'?eff.trainSpeedArc : eff.trainSpeedCav; return Math.floor(u.time/Math.max(1,mult))}
 
-/* ===== Construction ===== */
+/* ===== Construction, Training, Missions, Rendering — unchanged from the clean build (shortened) ===== */
+let lastTick=Date.now(), autosaveTimer=0;
+function gameTick(){
+  const now=Date.now(), dt=(now-lastTick)/1000; lastTick=now;
+  const prod=prodPerSec(); for(const k of ['wood','clay','iron','food']){ state.resources[k]+=(prod[k]||0)*dt }
+  tickConstruction(now); tickTraining(now);
+  if(state.mission && now>=state.mission.finish){ finalizeMission(); }
+  state.timePlayedMs += dt*1000;
+  autosaveTimer+=dt; if(autosaveTimer>=10){ saveState(); autosaveTimer=0; }
+  render();
+  requestAnimationFrame(gameTick);
+}
 function queueUpgrade(id){
   if(state.construction) return alert('Your builders are busy.');
   const cost=getBuildCost(id);
@@ -274,8 +288,6 @@ function tickConstruction(now){
     updateBuildingMesh(id);
   }
 }
-
-/* ===== Training ===== */
 function queueTraining(type,count){
   count = Math.max(0, Math.floor(count));
   if(!count) return;
@@ -300,8 +312,6 @@ function tickTraining(now){
   }
   state.training=state.training.filter(q=>q.countLeft>0);
 }
-
-/* ===== Missions ===== */
 const townPlazaBonus=()=>buildingEffects().rewardBonus||0;
 const townPlazaSpeed=()=>buildingEffects().missionSpeed||0;
 const wallMitigation=()=>buildingEffects().mitigation||0;
@@ -371,20 +381,7 @@ function finalizeMission(){
   alert(res.success?`Mission success! Loot: +${fmt(entry.reward.wood)} wood, +${fmt(entry.reward.clay)} clay, +${fmt(entry.reward.iron)} iron, +${fmt(entry.reward.food)} food.`:'Mission failed.');
 }
 
-/* ===== Game Tick ===== */
-let lastTick=Date.now(), autosaveTimer=0;
-function gameTick(){
-  const now=Date.now(), dt=(now-lastTick)/1000; lastTick=now;
-  const prod=prodPerSec(); for(const k of ['wood','clay','iron','food']){ state.resources[k]+=(prod[k]||0)*dt }
-  tickConstruction(now); tickTraining(now);
-  if(state.mission && now>=state.mission.finish){ finalizeMission(); }
-  state.timePlayedMs += dt*1000;
-  autosaveTimer+=dt; if(autosaveTimer>=10){ saveState(); autosaveTimer=0; }
-  render();
-  requestAnimationFrame(gameTick);
-}
-
-/* ===== Rendering ===== */
+/* ---- UI renderers ---- */
 function renderResources(){
   const prod=prodPerSec();
   document.getElementById('r-wood').textContent=fmt(state.resources.wood);
@@ -442,9 +439,12 @@ function renderArmy(){
   }
 }
 function renderMissions(){
-  document.getElementById('tp-bonus').textContent=percent(townPlazaBonus());
-  document.getElementById('tp-speed').textContent=percent(townPlazaSpeed());
-  document.getElementById('wall-mit').textContent=percent(wallMitigation());
+  const tpB=buildingEffects().rewardBonus||0;
+  const tpS=buildingEffects().missionSpeed||0;
+  const wM=buildingEffects().mitigation||0;
+  document.getElementById('tp-bonus').textContent=percent(tpB);
+  document.getElementById('tp-speed').textContent=percent(tpS);
+  document.getElementById('wall-mit').textContent=percent(wM);
   const m=state.mission, box=document.getElementById('mission-active');
   if(m){
     box.style.display=''; const now=Date.now(), pct=clamp((now-m.start)/(m.finish-m.start),0,1)*100;
@@ -463,69 +463,161 @@ function renderMissionLog(){
     list.appendChild(d);
   }
 }
-function renderMarket(){ document.getElementById('trade-fee').textContent=percent(buildingEffects().fee)+'%'; }
-function render(){ renderResources(); renderBuildings(); renderTraining(); renderArmy(); renderMissions(); renderMarket(); update3DHover(); }
+function renderMarket(){ document.getElementById('trade-fee').textContent=Math.round(buildingEffects().fee*100)+'%'; }
+function render(){ renderResources(); renderBuildings(); renderTraining(); renderArmy(); renderMissions(); renderMarket(); }
 
 /* ===== UI wiring ===== */
 document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); const t=b.dataset.tab; ['units','missions','market','army','help'].forEach(id=>{ document.getElementById('tab-'+id).style.display=(id===t)?'':'none'; }); });
 document.getElementById('btn-save').onclick=()=>{ saveState(); alert('Game saved!'); };
-document.getElementById('btn-reset').onclick=()=>{ if(confirm('Wipe your save and restart?')){ localStorage.removeItem('vw-save-iso-clean2'); state=deepClone(DEFAULT_STATE); init3DStateSync(); } };
+document.getElementById('btn-reset').onclick=()=>{ if(confirm('Wipe your save and restart?')){ localStorage.removeItem('vw-save-iso-persp'); state=deepClone(DEFAULT_STATE); init3DStateSync(); } };
 document.getElementById('btn-trade').onclick=()=>{ const f=document.getElementById('trade-from').value, t=document.getElementById('trade-to').value; if(f===t) return alert('Pick different resources.'); const a=parseInt(document.getElementById('trade-amt').value||'0',10); if(a<=0) return; if(state.resources[f]<a) return alert('Not enough to trade.'); const fee=buildingEffects().fee; const r=Math.floor(a*(1-fee)); state.resources[f]-=a; state.resources[t]+=r; renderResources(); renderMarket(); };
 document.getElementById('btn-send-mission').onclick=()=>{ const diff=parseInt(document.getElementById('mission-diff').value,10); const send={ infantry:parseInt(document.getElementById('send-infantry').value||'0',10), archer:parseInt(document.getElementById('send-archer').value||'0',10), cavalry:parseInt(document.getElementById('send-cavalry').value||'0',10) }; const tot=send.infantry+send.archer+send.cavalry; if(tot<=0) return alert('Send at least one unit.'); sendMission(diff,send); document.getElementById('send-infantry').value=0; document.getElementById('send-archer').value=0; document.getElementById('send-cavalry').value=0; renderMissions(); };
 
-/* ===== 3D (Orthographic, locked camera) ===== */
+/* ===== 3D (Perspective, locked camera, shadows, skydome) ===== */
 let renderer, scene, camera, raycaster, mouse; const meshes={}; const tip=document.getElementById('hover-tip');
 function init3D(){
   try{
     const el=document.getElementById('scene3d');
-    scene=new THREE.Scene(); scene.fog=new THREE.Fog(0x9fcf7a,50,140);
-    const w=el.clientWidth,h=el.clientHeight; const frustum=22, aspect=w/h;
-    camera=new THREE.OrthographicCamera(-frustum*aspect,frustum*aspect,frustum,-frustum,0.1,500);
-    camera.position.set(46,28,34); camera.lookAt(0,4,0); camera.zoom=1.4; camera.updateProjectionMatrix();
-    renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setSize(w,h); renderer.setPixelRatio(window.devicePixelRatio||1); el.appendChild(renderer.domElement);
-    const sun=new THREE.DirectionalLight(0xffffff,1.0); sun.position.set(40,60,30); scene.add(sun); scene.add(new THREE.AmbientLight(0xf7e9c8,0.7));
-    const ground=new THREE.Mesh(new THREE.CylinderGeometry(30,30,1,80), new THREE.MeshLambertMaterial({color:0x8eb96f})); ground.position.y=-0.5; scene.add(ground);
-    const pathMat=new THREE.MeshLambertMaterial({color:0xe1cfaa}); const ring=new THREE.Mesh(new THREE.TorusGeometry(12,0.7,16,64), pathMat); ring.rotation.x=Math.PI/2; ring.position.y=0.1; scene.add(ring);
-    const spokes=new THREE.Group(); for(let a=0;a<6;a++){ const seg=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.2,9), pathMat); seg.position.set(Math.cos(a*Math.PI/3)*6,0.1,Math.sin(a*Math.PI/3)*6); seg.lookAt(0,0.1,0); spokes.add(seg) } scene.add(spokes);
-    const posts=new THREE.Group(); const postGeo=new THREE.CylinderGeometry(0.28,0.36,4,6); const postMat=new THREE.MeshLambertMaterial({color:0x7a5a32}); const count=72,R=26.5;
-    for(let i=0;i<count;i++){ const a=i/count*Math.PI*2; const m=new THREE.Mesh(postGeo,postMat); m.position.set(Math.cos(a)*R,1.8,Math.sin(a)*R); m.rotation.y=-a; posts.add(m) } scene.add(posts);
-    const plaza=new THREE.Mesh(new THREE.CylinderGeometry(5.2,5.2,0.2,32), new THREE.MeshLambertMaterial({color:0xe6d6b7})); plaza.position.y=0; scene.add(plaza);
+    scene=new THREE.Scene();
+    const skyTop = 0xa6d2ff, skyHorizon = 0x8bcf6a;
+    scene.fog=new THREE.Fog(0x88c97a, 60, 180);
+
+    const w=el.clientWidth,h=el.clientHeight;
+    camera=new THREE.PerspectiveCamera(44, w/h, 0.1, 500);
+    camera.position.set(36, 22, 40); // cinematic angle
+    camera.lookAt(0, 3, 0);
+
+    renderer=new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(w,h);
+    renderer.setPixelRatio(window.devicePixelRatio||1);
+    renderer.setClearColor(skyTop, 1);
+    renderer.shadowMap.enabled=true;
+    renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    el.appendChild(renderer.domElement);
+
+    // Skydome (big inverted sphere with vertex colors)
+    const skyGeo=new THREE.SphereGeometry(260, 32, 18);
+    const skyMat=new THREE.MeshBasicMaterial({color:0xffffff, side:THREE.BackSide, fog:false, vertexColors:true});
+    const sky= new THREE.Mesh(skyGeo, skyMat);
+    const colors=skyGeo.attributes.position;
+    const colorArr=new Float32Array(colors.count*3);
+    for(let i=0;i<colors.count;i++){
+      const y=skyGeo.attributes.position.getY(i)/260; // -1..1
+      const t=(y+0.4)/1.4; // bias horizon
+      const r1=( (skyTop>>16)&255)/255, g1=((skyTop>>8)&255)/255, b1=(skyTop&255)/255;
+      const r2=( (skyHorizon>>16)&255)/255, g2=((skyHorizon>>8)&255)/255, b2=(skyHorizon&255)/255;
+      colorArr[i*3+0]=r1*t + r2*(1-t);
+      colorArr[i*3+1]=g1*t + g2*(1-t);
+      colorArr[i*3+2]=b1*t + b2*(1-t);
+    }
+    skyGeo.setAttribute('color', new THREE.BufferAttribute(colorArr,3));
+    scene.add(sky);
+
+    // Lights
+    const hemi=new THREE.HemisphereLight(0xdef6ff, 0x6fa45a, 0.6); scene.add(hemi);
+    const sun=new THREE.DirectionalLight(0xfff6e8, 0.95); sun.position.set(50,70,30); sun.castShadow=true;
+    sun.shadow.mapSize.set(2048,2048);
+    sun.shadow.camera.left=-70; sun.shadow.camera.right=70; sun.shadow.camera.top=70; sun.shadow.camera.bottom=-70;
+    scene.add(sun);
+
+    // Ground & plaza
+    const ground=new THREE.Mesh(new THREE.CylinderGeometry(34,34,1,120), new THREE.MeshLambertMaterial({color:0x8dbf6e}));
+    ground.position.y=-0.5; ground.receiveShadow=true; scene.add(ground);
+
+    const ringMat=new THREE.MeshLambertMaterial({color:0xe1cfaa});
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(13,0.8,18,80), ringMat); ring.rotation.x=Math.PI/2; ring.position.y=0.02; ring.receiveShadow=true; scene.add(ring);
+    const spokes=new THREE.Group(); for(let a=0;a<6;a++){ const seg=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.22,10), ringMat); seg.position.set(Math.cos(a*Math.PI/3)*6,0.12,Math.sin(a*Math.PI/3)*6); seg.lookAt(0,0.12,0); seg.receiveShadow=true; spokes.add(seg) } scene.add(spokes);
+    const plaza=new THREE.Mesh(new THREE.CylinderGeometry(5.5,5.5,0.25,32), new THREE.MeshLambertMaterial({color:0xd8c6a5})); plaza.position.y=0.05; plaza.receiveShadow=true; scene.add(plaza);
+
+    // Palisade with gate + towers
+    const pal=new THREE.Group(); const postGeo=new THREE.CylinderGeometry(0.34,0.5,4.4,6); const postMat=new THREE.MeshLambertMaterial({color:0x7a5a32});
+    const postCount=84,R=28.2;
+    for(let i=0;i<postCount;i++){
+      const a=i/postCount*Math.PI*2;
+      const m=new THREE.Mesh(postGeo,postMat); m.position.set(Math.cos(a)*R,1.9,Math.sin(a)*R); m.rotation.y=-a; m.castShadow=true; m.receiveShadow=true; pal.add(m);
+    }
+    // gate
+    function makeTower(){
+      const g=new THREE.Group();
+      const base=new THREE.Mesh(new THREE.BoxGeometry(2.2,5,2.2), new THREE.MeshLambertMaterial({color:0x8e7a62})); base.position.y=2.5; base.castShadow=true;base.receiveShadow=true; g.add(base);
+      const roof=new THREE.Mesh(new THREE.ConeGeometry(1.6,1.2,6), new THREE.MeshLambertMaterial({color:0xaa7a3a})); roof.position.y=5.6; roof.castShadow=true; g.add(roof);
+      return g;
+    }
+    const towerLeft=makeTower(), towerRight=makeTower();
+    towerLeft.position.set(Math.cos(Math.PI/6)*R,0,Math.sin(Math.PI/6)*R);
+    towerRight.position.set(Math.cos(Math.PI/6+0.22)*R,0,Math.sin(Math.PI/6+0.22)*R);
+    pal.add(towerLeft); pal.add(towerRight);
+    scene.add(pal);
+
+    // Buildings ring
     const order=['townCenter','townPlaza','lumbermill','clayMine','ironMine','farm','houses','market','barracks','archerCamp','stable','wall'];
-    const radius=18;
-    order.forEach((id,idx)=>{ const ang=(idx/order.length)*Math.PI*2 + Math.PI/10; const x=Math.cos(ang)*radius, z=Math.sin(ang)*radius; const g=makeBuildingMesh(id); g.position.set(x,0,z); g.lookAt(0,0,0); scene.add(g); meshes[id]=g; });
-    // Deco
-    const deco=new THREE.Group(); const trunk=new THREE.CylinderGeometry(0.25,0.35,1.2,6); const leaves=new THREE.ConeGeometry(0.8,1.6,8);
-    for(let i=0;i<18;i++){ const a=Math.random()*Math.PI*2, r=14+Math.random()*12; const t=new THREE.Mesh(trunk,new THREE.MeshLambertMaterial({color:0x7a5a32})); t.position.set(Math.cos(a)*r,0.6,Math.sin(a)*r); deco.add(t); const c=new THREE.Mesh(leaves,new THREE.MeshLambertMaterial({color:0x3c7a3a})); c.position.set(t.position.x,1.7,t.position.z); deco.add(c) }
-    const rockG=new THREE.IcosahedronGeometry(0.6,0); const rockM=new THREE.MeshLambertMaterial({color:0xa8a8b0}); for(let i=0;i<10;i++){ const a=Math.random()*Math.PI*2, r=16+Math.random()*10; const k=new THREE.Mesh(rockG,rockM); k.position.set(Math.cos(a)*r,0.2,Math.sin(a)*r); k.scale.setScalar(0.6+Math.random()*0.8); deco.add(k) }
+    const radius=19.2;
+    order.forEach((id,idx)=>{
+      const ang=(idx/order.length)*Math.PI*2 + 0.32;
+      const x=Math.cos(ang)*radius, z=Math.sin(ang)*radius;
+      const g=makeBuildingMesh(id); g.position.set(x,0,z); g.lookAt(0,0,0);
+      g.traverse(o=>{o.castShadow=true; o.receiveShadow=true;});
+      scene.add(g); meshes[id]=g;
+    });
+
+    // trees & rocks (decor)
+    const deco=new THREE.Group();
+    const trunk=new THREE.CylinderGeometry(0.25,0.35,1.3,6);
+    const leaves=new THREE.ConeGeometry(0.9,1.7,8);
+    const trunkM=new THREE.MeshLambertMaterial({color:0x7a5a32});
+    const leavesM=new THREE.MeshLambertMaterial({color:0x3a7a3a});
+    for(let i=0;i<26;i++){
+      const a=Math.random()*Math.PI*2, r=15+Math.random()*14;
+      const t=new THREE.Mesh(trunk,trunkM); t.position.set(Math.cos(a)*r,0.65,Math.sin(a)*r); deco.add(t);
+      const c=new THREE.Mesh(leaves,leavesM); c.position.set(t.position.x,1.8,t.position.z); deco.add(c);
+    }
+    const rockG=new THREE.IcosahedronGeometry(0.7,0);
+    const rockM=new THREE.MeshLambertMaterial({color:0x9fa3ae});
+    for(let i=0;i<14;i++){
+      const a=Math.random()*Math.PI*2, r=16+Math.random()*12;
+      const k=new THREE.Mesh(rockG,rockM); k.position.set(Math.cos(a)*r,0.25,Math.sin(a)*r); k.scale.setScalar(0.6+Math.random()*0.9); deco.add(k);
+    }
     scene.add(deco);
+
+    // Picking
     raycaster=new THREE.Raycaster(); mouse=new THREE.Vector2();
     el.addEventListener('mousemove',e=>{const rect=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-rect.left)/rect.width)*2-1; mouse.y= -((e.clientY-rect.top)/rect.height)*2+1;});
     el.addEventListener('click',on3DClick);
-    window.addEventListener('resize',()=>{const w2=el.clientWidth,h2=el.clientHeight; camera.left=-frustum*(w2/h2); camera.right=frustum*(w2/h2); camera.top=frustum; camera.bottom=-frustum; camera.updateProjectionMatrix(); renderer.setSize(w2,h2) });
+
+    window.addEventListener('resize',()=>{
+      const w2=el.clientWidth,h2=el.clientHeight;
+      camera.aspect=w2/h2; camera.updateProjectionMatrix();
+      renderer.setSize(w2,h2);
+    });
+
     animate3D();
   }catch(e){
     document.getElementById('three-warning').style.display='block'; console.error(e);
   }
 }
 function makeRoof(radius,height,color){ const r=new THREE.Mesh(new THREE.ConeGeometry(radius,height,4), new THREE.MeshLambertMaterial({color})); r.rotation.y=Math.PI/4; r.position.y=2.1; return r; }
-function updateBuildingMeshScale(g,lvl){ const s=0.9 + lvl*0.08; g.scale.set(s,0.9+lvl*0.12,s); }
+function updateBuildingMeshScale(g,lvl){ const s=0.95 + lvl*0.08; g.scale.set(s,0.95+lvl*0.12,s); }
 function makeBuildingMesh(id){
   const group=new THREE.Group(); const lvl=buildingLevel(id);
-  const base=new THREE.Mesh(new THREE.CylinderGeometry(2.6,2.6,0.35,16), new THREE.MeshLambertMaterial({color:0xd9c79c})); base.position.y=0.175; group.add(base);
-  const wood=0x835634, stone=0x9a9a9a, roof=0xaa3a2a, thatch=0xcbb44a, canvas=0xe8d3a3;
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(2.8,2.8,0.35,16), new THREE.MeshLambertMaterial({color:0xd9c79c})); base.position.y=0.175; group.add(base);
+  const wood=0x835634, stone=0x9a9a9a, roof=0xbb6b3b, thatch=0xd7c068, canvas=0xe8d3a3;
   let core;
   switch(id){
-    case 'townCenter': core=new THREE.Mesh(new THREE.BoxGeometry(3.2,3.2,3.2), new THREE.MeshLambertMaterial({color:stone})); core.position.y=1.8; group.add(core); group.add(makeRoof(2.0,1.2,roof)); break;
-    case 'townPlaza': core=new THREE.Mesh(new THREE.CylinderGeometry(1.8,1.8,1.0,12), new THREE.MeshLambertMaterial({color:0xc9b28c})); core.position.y=0.8; group.add(core); break;
-    case 'lumbermill': core=new THREE.Mesh(new THREE.BoxGeometry(3,1.6,2.4), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.1; group.add(core); group.add(makeRoof(1.8,1.0,thatch)); break;
-    case 'clayMine': core=new THREE.Mesh(new THREE.ConeGeometry(1.6,1.4,8), new THREE.MeshLambertMaterial({color:0xb5653e})); core.position.y=1.2; group.add(core); break;
-    case 'ironMine': core=new THREE.Mesh(new THREE.ConeGeometry(1.6,1.6,6), new THREE.MeshLambertMaterial({color:0x6d6d75})); core.position.y=1.3; group.add(core); break;
-    case 'farm': core=new THREE.Mesh(new THREE.BoxGeometry(2.6,0.6,2.6), new THREE.MeshLambertMaterial({color:0xc8d87a})); core.position.y=0.6; group.add(core); break;
-    case 'houses': for(let i=0;i<3;i++){ const h=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.2,1.2), new THREE.MeshLambertMaterial({color:0xd6c6a5})); h.position.set((i-1)*0.9,0.8,(i%2?0.6:-0.6)); group.add(h); const r=new THREE.Mesh(new THREE.ConeGeometry(0.9,0.6,4), new THREE.MeshLambertMaterial({color:roof})); r.position.set(h.position.x,1.6,h.position.z); group.add(r);} break;
-    case 'market': core=new THREE.Mesh(new THREE.BoxGeometry(2.6,1.2,2.0), new THREE.MeshLambertMaterial({color:0xd9c79c})); core.position.y=1.0; group.add(core); const aw=new THREE.Mesh(new THREE.PlaneGeometry(2.2,1.4), new THREE.MeshLambertMaterial({color:canvas, side:THREE.DoubleSide})); aw.rotation.x=-Math.PI/2; aw.position.set(0,1.7,0); group.add(aw); break;
-    case 'barracks': core=new THREE.Mesh(new THREE.BoxGeometry(3.4,1.4,1.8), new THREE.MeshLambertMaterial({color:stone})); core.position.y=1.1; group.add(core); group.add(makeRoof(2.0,0.9,thatch)); break;
-    case 'archerCamp': core=new THREE.Mesh(new THREE.BoxGeometry(2.8,1.2,1.6), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.0; group.add(core); break;
-    case 'stable': core=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.4,2.0), new THREE.MeshLambertMaterial({color:0xcaa06a})); core.position.y=1.1; group.add(core); break;
+    case 'townCenter': {
+      const b1=new THREE.Mesh(new THREE.BoxGeometry(3.4,2.2,2.8), new THREE.MeshLambertMaterial({color:stone})); b1.position.y=1.4; group.add(b1);
+      const tower=new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,3.6,10), new THREE.MeshLambertMaterial({color:0xbdbdbd})); tower.position.set(1.2,2.4,0.3); group.add(tower);
+      const r=makeRoof(2.2,1.1,roof); r.position.y=2.6; group.add(r);
+    } break;
+    case 'townPlaza': core=new THREE.Mesh(new THREE.CylinderGeometry(2.0,2.0,0.6,14), new THREE.MeshLambertMaterial({color:0xcdbb96})); core.position.y=0.8; group.add(core); break;
+    case 'lumbermill': core=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.6,2.4), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.1; group.add(core); group.add(makeRoof(1.9,1.0,thatch)); break;
+    case 'clayMine': core=new THREE.Mesh(new THREE.ConeGeometry(1.7,1.5,8), new THREE.MeshLambertMaterial({color:0xb5653e})); core.position.y=1.2; group.add(core); break;
+    case 'ironMine': core=new THREE.Mesh(new THREE.ConeGeometry(1.7,1.8,6), new THREE.MeshLambertMaterial({color:0x6d6d75})); core.position.y=1.3; group.add(core); break;
+    case 'farm': core=new THREE.Mesh(new THREE.BoxGeometry(2.8,0.6,2.8), new THREE.MeshLambertMaterial({color:0xc8d87a})); core.position.y=0.6; group.add(core); break;
+    case 'houses': for(let i=0;i<3;i++){ const h=new THREE.Mesh(new THREE.BoxGeometry(1.3,1.2,1.2), new THREE.MeshLambertMaterial({color:0xd6c6a5})); h.position.set((i-1)*0.9,0.85,(i%2?0.6:-0.6)); group.add(h); const r=new THREE.Mesh(new THREE.ConeGeometry(0.95,0.6,4), new THREE.MeshLambertMaterial({color:roof})); r.position.set(h.position.x,1.6,h.position.z); group.add(r);} break;
+    case 'market': core=new THREE.Mesh(new THREE.BoxGeometry(2.8,1.2,2.0), new THREE.MeshLambertMaterial({color:0xd9c79c})); core.position.y=1.0; group.add(core); const aw=new THREE.Mesh(new THREE.PlaneGeometry(2.4,1.5), new THREE.MeshLambertMaterial({color:canvas, side:THREE.DoubleSide})); aw.rotation.x=-Math.PI/2; aw.position.set(0,1.7,0); group.add(aw); break;
+    case 'barracks': core=new THREE.Mesh(new THREE.BoxGeometry(3.6,1.5,1.8), new THREE.MeshLambertMaterial({color:stone})); core.position.y=1.1; group.add(core); group.add(makeRoof(2.0,0.9,thatch)); break;
+    case 'archerCamp': core=new THREE.Mesh(new THREE.BoxGeometry(3.0,1.2,1.8), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.0; group.add(core); break;
+    case 'stable': core=new THREE.Mesh(new THREE.BoxGeometry(3.4,1.4,2.2), new THREE.MeshLambertMaterial({color:0xcaa06a})); core.position.y=1.1; group.add(core); break;
     case 'wall': core=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.2,2.6,8), new THREE.MeshLambertMaterial({color:stone})); core.position.y=1.6; group.add(core); break;
   }
   updateBuildingMeshScale(group,lvl); group.userData.id=id; return group;
@@ -547,10 +639,10 @@ function on3DClick(e){
   const hits=raycaster.intersectObjects(Object.values(meshes),true);
   if(hits.length>0){ let p=hits[0].object; while(p && !p.userData.id) p=p.parent; if(p && p.userData.id){ const id=p.userData.id; const card=document.querySelector('[data-card="'+id+'"]'); if(card){ card.scrollIntoView({behavior:'smooth',block:'center'}); card.style.outline='3px solid #2f7a3e'; setTimeout(()=>card.style.outline='',1200) } } }
 }
-function update3DHover(){ /* Nothing extra for now */ }
 function init3DStateSync(){ Object.keys(meshes).forEach(id=>updateBuildingMesh(id)); }
 
 /* ===== Boot ===== */
+function renderMarket(){ document.getElementById('trade-fee').textContent=Math.round(buildingEffects().fee*100)+'%'; }
 window.addEventListener('beforeunload', saveState);
 init3D();
 render();
