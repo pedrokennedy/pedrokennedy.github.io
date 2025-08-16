@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Village Wars — 3D Isometric Camera (Fix)</title>
+<title>Village Wars — 3D Isometric (Clean)</title>
 <style>
   :root{
     --bg:#e9dec1;--panel:#f7f0db;--wood:#8b5a2b;--wood-dark:#5d3b1a;--ink:#3a2a17;
@@ -66,7 +66,7 @@
   <div class="wrap">
     <section class="panel">
       <h2>Village View</h2>
-      <div class="sub">Locked 3D camera at a cinematic angle (like your screenshot). Click a building to focus its card.</div>
+      <div class="sub">Locked 3D camera at a cinematic angle. Click a building to focus its card.</div>
       <div id="scene3d"><div id="hover-tip"></div></div>
       <div id="three-warning" class="sub" style="display:none;margin-top:8px;color:#a32a2a">
         Couldn’t load WebGL/Three.js. Please open with internet enabled or allow WebGL.
@@ -166,168 +166,353 @@
   </div>
 </main>
 
-<!-- Three.js -->
-<script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
-<script>
-/* ========== Utilities & Core (formatTime patched to avoid template literals) ========== */
-function pad2(n){return (n<10?'0':'')+n;}
-function formatTime(ms){
-  var s=Math.max(0,Math.ceil(ms/1000));
-  var h=Math.floor(s/3600); s%=3600;
-  var m=Math.floor(s/60); s%=60;
-  return pad2(h)+':'+pad2(m)+':'+pad2(s);
+<!-- Module script -->
+<script type="module">
+import * as THREE from "https://unpkg.com/three@0.158.0/build/three.module.js";
+
+/* ===== Helpers ===== */
+const fmt = (n)=>Math.floor(n).toLocaleString();
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+function pad2(n){return (n<10?'0':'')+n}
+function formatTime(ms){let s=Math.max(0,Math.ceil(ms/1000));let h=Math.floor(s/3600);s%=3600;let m=Math.floor(s/60);s%=60;return pad2(h)+':'+pad2(m)+':'+pad2(s)}
+const deepClone = (o)=>JSON.parse(JSON.stringify(o));
+const percent=(n)=>Math.round(n*100);
+
+/* ===== Game Data ===== */
+const BUILDINGS = {
+  townCenter:{name:'Town Center',desc:'Speeds up construction.', baseCost:{wood:200,clay:200,iron:150,food:0}, costMult:1.55, baseTime:15000, effectLvl:(lvl)=>({buildSpeed:1+0.08*lvl})},
+  townPlaza:{name:'Town Plaza',desc:'Send missions. Improves rewards and mission speed.', baseCost:{wood:150,clay:150,iron:120,food:50}, costMult:1.5, baseTime:12000, effectLvl:(lvl)=>({rewardBonus:0.06*lvl, missionSpeed:0.03*lvl})},
+  lumbermill:{name:'Lumbermill',desc:'Generates wood.', baseCost:{wood:60,clay:50,iron:40,food:0}, costMult:1.45, baseTime:8000, production:'wood'},
+  clayMine:{name:'Clay Mine',desc:'Generates clay.', baseCost:{wood:50,clay:60,iron:40,food:0}, costMult:1.45, baseTime:8000, production:'clay'},
+  ironMine:{name:'Iron Mine',desc:'Generates iron.', baseCost:{wood:50,clay:50,iron:60,food:0}, costMult:1.45, baseTime:8000, production:'iron'},
+  farm:{name:'Farm',desc:'Generates food.', baseCost:{wood:70,clay:40,iron:40,food:0}, costMult:1.45, baseTime:8000, production:'food'},
+  houses:{name:'Houses',desc:'Increase population cap.', baseCost:{wood:80,clay:60,iron:60,food:0}, costMult:1.5, baseTime:9000, effectLvl:(lvl)=>({popCap:15*lvl})},
+  market:{name:'Market',desc:'Trade resources; higher level reduces fee.', baseCost:{wood:120,clay:120,iron:120,food:50}, costMult:1.5, baseTime:10000, effectLvl:(lvl)=>({fee:Math.max(0.2-0.015*lvl,0.05)})},
+  barracks:{name:'Barracks',desc:'Train infantry; speeds training.', baseCost:{wood:100,clay:70,iron:50,food:30}, costMult:1.5, baseTime:11000, effectLvl:(lvl)=>({trainSpeedInf:1+0.07*lvl})},
+  archerCamp:{name:'Archer Camp',desc:'Train archers; speeds training.', baseCost:{wood:120,clay:60,iron:80,food:30}, costMult:1.5, baseTime:11000, effectLvl:(lvl)=>({trainSpeedArc:1+0.07*lvl})},
+  stable:{name:'Stable',desc:'Train cavalry; speeds training.', baseCost:{wood:150,clay:120,iron:150,food:50}, costMult:1.5, baseTime:13000, effectLvl:(lvl)=>({trainSpeedCav:1+0.07*lvl})},
+  wall:{name:'Wall',desc:'Reduces mission casualties.', baseCost:{wood:120,clay:160,iron:200,food:0}, costMult:1.55, baseTime:14000, effectLvl:(lvl)=>({mitigation:Math.min(0.02*lvl,0.5)})}
+};
+const UNITS = {
+  infantry:{name:'Infantry', atk:5, hp:10, pop:1, time:9000, cost:{wood:50,clay:30,iron:20,food:10}, building:'barracks'},
+  archer  :{name:'Archer',   atk:7, hp:8,  pop:1, time:11000,cost:{wood:80,clay:20,iron:40,food:10}, building:'archerCamp'},
+  cavalry :{name:'Cavalry',  atk:15,hp:20, pop:3, time:16000,cost:{wood:100,clay:80,iron:120,food:30},building:'stable'}
+};
+const BASE_PROD = {wood:1.2, clay:1.1, iron:1.0, food:0.9};
+const DEFAULT_STATE = {
+  t0: Date.now(), timePlayedMs:0,
+  resources:{wood:200,clay:200,iron:200,food:100},
+  buildings:Object.fromEntries(Object.keys(BUILDINGS).map(k=>[k,1])),
+  construction:null,
+  units:{infantry:0, archer:0, cavalry:0},
+  training:[],
+  mission:null, missionLog:[],
+  reservedPop:0,
+};
+let state = loadState();
+function loadState(){ try{ const raw=localStorage.getItem('vw-save-iso-clean'); if(raw){ const s=JSON.parse(raw); return {...DEFAULT_STATE, ...s}; } }catch(e){} return deepClone(DEFAULT_STATE) }
+function saveState(){ localStorage.setItem('vw-save-iso-clean', JSON.stringify(state)) }
+
+/* ===== Calculations ===== */
+const buildingLevel = (id)=>state.buildings[id]||0;
+function buildingEffects(){
+  const eff={buildSpeed:1,rewardBonus:0,missionSpeed:0,mitigation:0,fee:0.2,trainSpeedInf:1,trainSpeedArc:1,trainSpeedCav:1,popCap:0};
+  for(const [id,def] of Object.entries(BUILDINGS)){
+    const lvl=buildingLevel(id); if(!def.effectLvl) continue;
+    const e=def.effectLvl(lvl); for(const k in e){eff[k]=(eff[k]||0)+e[k]}
+  }
+  eff.fee=BUILDINGS.market.effectLvl(buildingLevel('market')).fee;
+  eff.popCap=BUILDINGS.houses.effectLvl(buildingLevel('houses')).popCap||0;
+  return eff;
 }
-const fmt=n=>Math.floor(n).toLocaleString();
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-function percent(n){return Math.round(n*100)}; const deepClone=o=>JSON.parse(JSON.stringify(o));
+function prodPerSec(){
+  const res={wood:0,clay:0,iron:0,food:0};
+  for(const [bid,def] of Object.entries(BUILDINGS)){
+    if(!def.production) continue;
+    const lvl=buildingLevel(bid), r=def.production;
+    const base=BASE_PROD[r]||0;
+    const rate = base * Math.pow(lvl,1.2);
+    res[r]+=rate;
+  }
+  return res;
+}
+const canAfford=(cost)=>Object.entries(cost).every(([k,v])=>(state.resources[k]||0)>=v);
+const spend=(cost)=>{for(const [k,v] of Object.entries(cost)){state.resources[k]-=v}};
+function getBuildCost(id){
+  const def=BUILDINGS[id], lvl=buildingLevel(id);
+  const c={}; for(const r of ['wood','clay','iron','food']){ const base=def.baseCost[r]||0; c[r]=Math.floor(base*Math.pow(def.costMult,lvl-1)); }
+  return c;
+}
+function getBuildTimeMs(id){
+  const def=BUILDINGS[id], lvl=buildingLevel(id);
+  const base=def.baseTime*Math.pow(1.35, Math.max(0,lvl-1));
+  const speed=buildingEffects().buildSpeed;
+  return Math.floor(base/Math.max(1,speed));
+}
+function idlePopulation(){ const used=Object.entries(state.units).reduce((a,[t,n])=>a+n*UNITS[t].pop,0); return used-state.reservedPop; }
+const totalPopulationCap = ()=>buildingEffects().popCap;
+const freePopulation = ()=>Math.max(0,totalPopulationCap()-idlePopulation());
+const unitCost=(t)=>deepClone(UNITS[t].cost);
+function unitTimeMs(t){ const u=UNITS[t], eff=buildingEffects(); const mult = t==='infantry'?eff.trainSpeedInf : t==='archer'?eff.trainSpeedArc : eff.trainSpeedCav; return Math.floor(u.time/Math.max(1,mult))}
 
-const BUILDINGS={
-  townCenter:{name:'Town Center',desc:'Speeds up construction.', baseCost:{wood:200,clay:200,iron:150,food:0}, costMult:1.55, baseTime:15000, effectLvl:(lvl)=>({buildSpeed:1+0.08*lvl})},
-  townPlaza:{name:'Town Plaza',desc:'Send missions. Improves rewards and mission speed.', baseCost:{wood:150,clay:150,iron:120,food:50}, costMult:1.5, baseTime:12000, effectLvl:(lvl)=>({rewardBonus:0.06*lvl, missionSpeed:0.03*lvl})},
-  lumbermill:{name:'Lumbermill',desc:'Generates wood.', baseCost:{wood:60,clay:50,iron:40,food:0}, costMult:1.45, baseTime:8000, production:'wood'},
-  clayMine:{name:'Clay Mine',desc:'Generates clay.', baseCost:{wood:50,clay:60,iron:40,food:0}, costMult:1.45, baseTime:8000, production:'clay'},
-  ironMine:{name:'Iron Mine',desc:'Generates iron.', baseCost:{wood:50,clay:50,iron:60,food:0}, costMult:1.45, baseTime:8000, production:'iron'},
-  farm:{name:'Farm',desc:'Generates food.', baseCost:{wood:70,clay:40,iron:40,food:0}, costMult:1.45, baseTime:8000, production:'food'},
-  houses:{name:'Houses',desc:'Increase population cap.', baseCost:{wood:80,clay:60,iron:60,food:0}, costMult:1.5, baseTime:9000, effectLvl:(lvl)=>({popCap:15*lvl})},
-  market:{name:'Market',desc:'Trade resources; higher level reduces fee.', baseCost:{wood:120,clay:120,iron:120,food:50}, costMult:1.5, baseTime:10000, effectLvl:(lvl)=>({fee:Math.max(0.2-0.015*lvl,0.05)})},
-  barracks:{name:'Barracks',desc:'Train infantry; speeds training.', baseCost:{wood:100,clay:70,iron:50,food:30}, costMult:1.5, baseTime:11000, effectLvl:(lvl)=>({trainSpeedInf:1+0.07*lvl})},
-  archerCamp:{name:'Archer Camp',desc:'Train archers; speeds training.', baseCost:{wood:120,clay:60,iron:80,food:30}, costMult:1.5, baseTime:11000, effectLvl:(lvl)=>({trainSpeedArc:1+0.07*lvl})},
-  stable:{name:'Stable',desc:'Train cavalry; speeds training.', baseCost:{wood:150,clay:120,iron:150,food:50}, costMult:1.5, baseTime:13000, effectLvl:(lvl)=>({trainSpeedCav:1+0.07*lvl})},
-  wall:{name:'Wall',desc:'Reduces mission casualties.', baseCost:{wood:120,clay:160,iron:200,food:0}, costMult:1.55, baseTime:14000, effectLvl:(lvl)=>({mitigation:Math.min(0.02*lvl,0.5)})}
-};
-const UNITS={infantry:{name:'Infantry',atk:5,hp:10,pop:1,time:9000,cost:{wood:50,clay:30,iron:20,food:10},building:'barracks'},archer:{name:'Archer',atk:7,hp:8,pop:1,time:11000,cost:{wood:80,clay:20,iron:40,food:10},building:'archerCamp'},cavalry:{name:'Cavalry',atk:15,hp:20,pop:3,time:16000,cost:{wood:100,clay:80,iron:120,food:30},building:'stable'}};
-const BASE_PROD={wood:1.2,clay:1.1,iron:1.0,food:0.9};
-const DEFAULT_STATE={t0:Date.now(),timePlayedMs:0,resources:{wood:200,clay:200,iron:200,food:100},buildings:Object.fromEntries(Object.keys(BUILDINGS).map(k=>[k,1])),construction:null,units:{infantry:0,archer:0,cavalry:0},training:[],mission:null,missionLog:[],reservedPop:0};
-let state=loadState(); function loadState(){try{const raw=localStorage.getItem('vw-save-3d-iso-fix');if(raw){const s=JSON.parse(raw);return {...DEFAULT_STATE,...s}}}catch(e){}return deepClone(DEFAULT_STATE)}; function saveState(){localStorage.setItem('vw-save-3d-iso-fix',JSON.stringify(state))}
+/* ===== Construction ===== */
+function queueUpgrade(id){
+  if(state.construction) return alert('Your builders are busy.');
+  const cost=getBuildCost(id);
+  if(!canAfford(cost)) return alert('Not enough resources.');
+  spend(cost);
+  const now=Date.now(), ms=getBuildTimeMs(id);
+  state.construction={id,start:now,finish:now+ms,ms};
+  render();
+}
+function tickConstruction(now){
+  if(!state.construction) return;
+  const {id,finish}=state.construction;
+  if(now>=finish){
+    state.buildings[id]=(state.buildings[id]||1)+1;
+    state.construction=null;
+    updateBuildingMesh(id);
+  }
+}
 
-const fmt=n=>Math.floor(n).toLocaleString();
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-function formatTime(ms){let s=Math.max(0,Math.ceil(ms/1000));const h=Math.floor(s/3600);s%=3600;const m=Math.floor(s/60);s%=60;return \`\${String(h).padStart(2,'0')}:\${String(m).padStart(2,'0')}:\${String(s).padStart(2,'0')}\`;}
-function percent(n){return Math.round(n*100)}; const deepClone=o=>JSON.parse(JSON.stringify(o));
+/* ===== Training ===== */
+function queueTraining(type,count){
+  count = Math.max(0, Math.floor(count));
+  if(!count) return;
+  const popNeeded=UNITS[type].pop*count;
+  if(popNeeded>freePopulation()) return alert('Not enough population capacity (build Houses).');
+  const c=unitCost(type);
+  const totalCost={wood:c.wood*count,clay:c.clay*count,iron:c.iron*count,food:c.food*count};
+  if(!canAfford(totalCost)) return alert('Not enough resources.');
+  spend(totalCost);
+  const perUnit=unitTimeMs(type);
+  const now=Date.now();
+  state.training.push({type,countLeft:count,perUnit,start:now,finish:now+perUnit,building:UNITS[type].building});
+}
+function tickTraining(now){
+  if(state.training.length===0) return;
+  for(const q of state.training){
+    if(now>=q.finish && q.countLeft>0){
+      state.units[q.type]+=1;
+      q.countLeft-=1;
+      if(q.countLeft>0){ q.start=now; q.finish=now+q.perUnit; }
+    }
+  }
+  state.training=state.training.filter(q=>q.countLeft>0);
+}
 
-const BUILDINGS={
-  townCenter:{name:'Town Center',desc:'Speeds up construction.', baseCost:{wood:200,clay:200,iron:150,food:0}, costMult:1.55, baseTime:15000, effectLvl:(lvl)=>({buildSpeed:1+0.08*lvl})},
-  townPlaza:{name:'Town Plaza',desc:'Send missions. Improves rewards and mission speed.', baseCost:{wood:150,clay:150,iron:120,food:50}, costMult:1.5, baseTime:12000, effectLvl:(lvl)=>({rewardBonus:0.06*lvl, missionSpeed:0.03*lvl})},
-  lumbermill:{name:'Lumbermill',desc:'Generates wood.', baseCost:{wood:60,clay:50,iron:40,food:0}, costMult:1.45, baseTime:8000, production:'wood'},
-  clayMine:{name:'Clay Mine',desc:'Generates clay.', baseCost:{wood:50,clay:60,iron:40,food:0}, costMult:1.45, baseTime:8000, production:'clay'},
-  ironMine:{name:'Iron Mine',desc:'Generates iron.', baseCost:{wood:50,clay:50,iron:60,food:0}, costMult:1.45, baseTime:8000, production:'iron'},
-  farm:{name:'Farm',desc:'Generates food.', baseCost:{wood:70,clay:40,iron:40,food:0}, costMult:1.45, baseTime:8000, production:'food'},
-  houses:{name:'Houses',desc:'Increase population cap.', baseCost:{wood:80,clay:60,iron:60,food:0}, costMult:1.5, baseTime:9000, effectLvl:(lvl)=>({popCap:15*lvl})},
-  market:{name:'Market',desc:'Trade resources; higher level reduces fee.', baseCost:{wood:120,clay:120,iron:120,food:50}, costMult:1.5, baseTime:10000, effectLvl:(lvl)=>({fee:Math.max(0.2-0.015*lvl,0.05)})},
-  barracks:{name:'Barracks',desc:'Train infantry; speeds training.', baseCost:{wood:100,clay:70,iron:50,food:30}, costMult:1.5, baseTime:11000, effectLvl:(lvl)=>({trainSpeedInf:1+0.07*lvl})},
-  archerCamp:{name:'Archer Camp',desc:'Train archers; speeds training.', baseCost:{wood:120,clay:60,iron:80,food:30}, costMult:1.5, baseTime:11000, effectLvl:(lvl)=>({trainSpeedArc:1+0.07*lvl})},
-  stable:{name:'Stable',desc:'Train cavalry; speeds training.', baseCost:{wood:150,clay:120,iron:150,food:50}, costMult:1.5, baseTime:13000, effectLvl:(lvl)=>({trainSpeedCav:1+0.07*lvl})},
-  wall:{name:'Wall',desc:'Reduces mission casualties.', baseCost:{wood:120,clay:160,iron:200,food:0}, costMult:1.55, baseTime:14000, effectLvl:(lvl)=>({mitigation:Math.min(0.02*lvl,0.5)})}
-};
-const UNITS={infantry:{name:'Infantry',atk:5,hp:10,pop:1,time:9000,cost:{wood:50,clay:30,iron:20,food:10},building:'barracks'},archer:{name:'Archer',atk:7,hp:8,pop:1,time:11000,cost:{wood:80,clay:20,iron:40,food:10},building:'archerCamp'},cavalry:{name:'Cavalry',atk:15,hp:20,pop:3,time:16000,cost:{wood:100,clay:80,iron:120,food:30},building:'stable'}};
-const BASE_PROD={wood:1.2,clay:1.1,iron:1.0,food:0.9};
-const DEFAULT_STATE={t0:Date.now(),timePlayedMs:0,resources:{wood:200,clay:200,iron:200,food:100},buildings:Object.fromEntries(Object.keys(BUILDINGS).map(k=>[k,1])),construction:null,units:{infantry:0,archer:0,cavalry:0},training:[],mission:null,missionLog:[],reservedPop:0};
-let state=loadState(); function loadState(){try{const raw=localStorage.getItem('vw-save-3d-iso');if(raw){const s=JSON.parse(raw);return {...DEFAULT_STATE,...s}}}catch(e){}return deepClone(DEFAULT_STATE)}; function saveState(){localStorage.setItem('vw-save-3d-iso',JSON.stringify(state))}
+/* ===== Missions ===== */
+const townPlazaBonus=()=>buildingEffects().rewardBonus||0;
+const townPlazaSpeed=()=>buildingEffects().missionSpeed||0;
+const wallMitigation=()=>buildingEffects().mitigation||0;
+function calcMissionDurationMs(diff){
+  let base = diff===1?45000: diff===2?60000:90000;
+  base = Math.floor(base*(1 - clamp(townPlazaSpeed(),0,0.7)));
+  return base;
+}
+function genWaves(diff){
+  const waves=[]; let base=75*diff;
+  for(let i=1;i<=3;i++){ const mult=Math.pow(1.55,i-1); const jitter=0.9+Math.random()*0.2; const power=Math.floor(base*mult*jitter); waves.push({power,result:null}); }
+  return waves;
+}
+function sendMission(diff, send){
+  if(state.mission) return alert('A mission is already active.');
+  for(const t of Object.keys(UNITS)){ if(send[t]>(state.units[t]||0)) return alert(`Not enough ${UNITS[t].name}.`); }
+  const popRes=Object.keys(send).reduce((a,t)=>a+send[t]*UNITS[t].pop,0);
+  state.reservedPop+=popRes;
+  for(const t in send){ state.units[t]-=send[t] }
+  const now=Date.now(), dur=calcMissionDurationMs(diff);
+  state.mission={diff,send,start:now,finish:now+dur,waves:genWaves(diff),resolved:false,log:null};
+}
+function simulateMission(){
+  const m=state.mission; if(!m) return;
+  const cur=deepClone(m.send);
+  const totalInitialHP=Object.entries(cur).reduce((hp,[t,n])=>hp+n*UNITS[t].hp,0);
+  let totalHP=totalInitialHP*(1+wallMitigation());
+  const totalATK=Object.entries(cur).reduce((a,[t,n])=>a+n*UNITS[t].atk,0);
+  let success=true;
+  for(let i=0;i<m.waves.length;i++){
+    const w=m.waves[i];
+    const under=Math.max(1,w.power/Math.max(1,totalATK));
+    const dmg=w.power*under*(1-wallMitigation());
+    totalHP-=dmg;
+    const survived=totalHP>0;
+    w.result=survived?'survived':'defeated';
+    if(!survived){ success=false; break; }
+  }
+  const hpLost=Math.max(0,totalInitialHP-Math.max(0,totalHP));
+  const lossRatio=clamp(hpLost/Math.max(1,totalInitialHP),0,0.95);
+  const casualties={infantry:0,archer:0,cavalry:0};
+  for(const t of Object.keys(cur)){
+    const n=cur[t]; const lost=Math.min(n,Math.floor(n*lossRatio*(1-wallMitigation()*0.5)));
+    casualties[t]=lost; cur[t]-=lost;
+  }
+  const survivors=cur;
+  const rewardMult=1+townPlazaBonus();
+  const baseReward=(m.diff===1?180:(m.diff===2?320:520));
+  const reward={
+    wood:Math.floor(baseReward*rewardMult*(0.9+Math.random()*0.3)),
+    clay:Math.floor(baseReward*rewardMult*(0.9+Math.random()*0.3)),
+    iron:Math.floor(baseReward*rewardMult*(0.9+Math.random()*0.3)),
+    food:Math.floor(0.6*baseReward*rewardMult*(0.9+Math.random()*0.3)),
+  };
+  return {success,casualties,survivors,reward};
+}
+function finalizeMission(){
+  const m=state.mission; if(!m) return;
+  const res=simulateMission();
+  const sentPop=Object.entries(m.send).reduce((a,[t,n])=>a+n*UNITS[t].pop,0);
+  state.reservedPop-=sentPop;
+  for(const t in res.survivors){ state.units[t]+=res.survivors[t] }
+  if(res.success){ for(const k in res.reward){ state.resources[k]+=res.reward[k] } }
+  const entry={time:new Date().toLocaleString(), diff:m.diff, success:res.success, sent:m.send, casualties:res.casualties, reward:res.success?res.reward:null, waves:m.waves.map(w=>({power:w.power,result:w.result}))};
+  state.missionLog.unshift(entry); state.missionLog=state.missionLog.slice(0,6);
+  state.mission=null; renderMissionLog();
+  alert(res.success?`Mission success! Loot: +${fmt(entry.reward.wood)} wood, +${fmt(entry.reward.clay)} clay, +${fmt(entry.reward.iron)} iron, +${fmt(entry.reward.food)} food.`:'Mission failed.');
+}
 
-function buildingLevel(id){return state.buildings[id]||0}
-function buildingEffects(){const eff={buildSpeed:1,rewardBonus:0,missionSpeed:0,mitigation:0,fee:0.2,trainSpeedInf:1,trainSpeedArc:1,trainSpeedCav:1,popCap:0};for(const [id,def] of Object.entries(BUILDINGS)){const lvl=buildingLevel(id);if(!def.effectLvl)continue;const e=def.effectLvl(lvl);for(const k in e){eff[k]=(eff[k]||0)+e[k]}} eff.fee=BUILDINGS.market.effectLvl(buildingLevel('market')).fee; eff.popCap=BUILDINGS.houses.effectLvl(buildingLevel('houses')).popCap||0; return eff}
-function prodPerSec(){const res={wood:0,clay:0,iron:0,food:0};for(const [bid,def] of Object.entries(BUILDINGS)){if(!def.production)continue;const lvl=buildingLevel(bid),r=def.production,base=BASE_PROD[r]||0,rate=base*Math.pow(lvl,1.2);res[r]+=rate}return res}
-const canAfford=c=>Object.entries(c).every(([k,v])=>(state.resources[k]||0)>=v); const spend=c=>{for(const [k,v] of Object.entries(c)){state.resources[k]-=v}}
-function getBuildCost(id){const def=BUILDINGS[id],lvl=buildingLevel(id);const c={};for(const r of ['wood','clay','iron','food']){const base=def.baseCost[r]||0;c[r]=Math.floor(base*Math.pow(def.costMult,lvl-1))}return c}
-function getBuildTimeMs(id){const def=BUILDINGS[id],lvl=buildingLevel(id);const base=def.baseTime*Math.pow(1.35,Math.max(0,lvl-1));const speed=buildingEffects().buildSpeed;return Math.floor(base/Math.max(1,speed))}
-function idlePopulation(){const used=Object.entries(state.units).reduce((a,[t,n])=>a+n*UNITS[t].pop,0);return used-state.reservedPop}
-function totalPopulationCap(){return buildingEffects().popCap}
-function freePopulation(){return Math.max(0,totalPopulationCap()-idlePopulation())}
-const unitCost=t=>deepClone(UNITS[t].cost);
-function unitTimeMs(t){const u=UNITS[t],eff=buildingEffects();const mult=t==='infantry'?eff.trainSpeedInf:t==='archer'?eff.trainSpeedArc:eff.trainSpeedCav;return Math.floor(u.time/Math.max(1,mult))}
+/* ===== Game Tick ===== */
+let lastTick=Date.now(), autosaveTimer=0;
+function gameTick(){
+  const now=Date.now(), dt=(now-lastTick)/1000; lastTick=now;
+  const prod=prodPerSec(); for(const k of ['wood','clay','iron','food']){ state.resources[k]+=(prod[k]||0)*dt }
+  tickConstruction(now); tickTraining(now);
+  if(state.mission && now>=state.mission.finish){ finalizeMission(); }
+  state.timePlayedMs += dt*1000;
+  autosaveTimer+=dt; if(autosaveTimer>=10){ saveState(); autosaveTimer=0; }
+  render();
+  requestAnimationFrame(gameTick);
+}
 
-function queueUpgrade(id){if(state.construction)return alert('Your builders are busy.');const cost=getBuildCost(id);if(!canAfford(cost))return alert('Not enough resources.');spend(cost);const now=Date.now(),ms=getBuildTimeMs(id);state.construction={id,start:now,finish:now+ms,ms};render()}
-function tickConstruction(now){if(!state.construction)return;const {id,finish}=state.construction;if(now>=finish){state.buildings[id]=(state.buildings[id]||1)+1;state.construction=null;updateBuildingMesh(id)}}
-function queueTraining(type,count){count=Math.max(0,Math.floor(count));if(!count)return;let popNeeded=UNITS[type].pop*count;if(popNeeded>freePopulation())return alert('Not enough population capacity (build Houses).');const c=unitCost(type);const totalCost={wood:c.wood*count,clay:c.clay*count,iron:c.iron*count,food:c.food*count};if(!canAfford(totalCost))return alert('Not enough resources.');spend(totalCost);const perUnit=unitTimeMs(type);const now=Date.now();state.training.push({type,countLeft:count,perUnit,start:now,finish:now+perUnit,building:UNITS[type].building})}
-function tickTraining(now){if(state.training.length===0)return;for(const q of state.training){if(now>=q.finish&&q.countLeft>0){state.units[q.type]+=1;q.countLeft-=1;if(q.countLeft>0){q.start=now;q.finish=now+q.perUnit}}}state.training=state.training.filter(q=>q.countLeft>0)}
+/* ===== Rendering ===== */
+function renderResources(){
+  const prod=prodPerSec();
+  document.getElementById('r-wood').textContent=fmt(state.resources.wood);
+  document.getElementById('r-clay').textContent=fmt(state.resources.clay);
+  document.getElementById('r-iron').textContent=fmt(state.resources.iron);
+  document.getElementById('r-food').textContent=fmt(state.resources.food);
+  document.getElementById('p-wood').textContent='+'+prod.wood.toFixed(2)+'/s';
+  document.getElementById('p-clay').textContent='+'+prod.clay.toFixed(2)+'/s';
+  document.getElementById('p-iron').textContent='+'+prod.iron.toFixed(2)+'/s';
+  document.getElementById('p-food').textContent='+'+prod.food.toFixed(2)+'/s';
+  document.getElementById('clock').textContent=formatTime(state.timePlayedMs);
+  document.getElementById('pop').textContent= idlePopulation()+'/'+totalPopulationCap();
+}
+function renderBuildings(){
+  const c=document.getElementById('buildings'); c.innerHTML='';
+  for(const [id,def] of Object.entries(BUILDINGS)){
+    const lvl=buildingLevel(id), cost=getBuildCost(id), timeMs=getBuildTimeMs(id);
+    const card=document.createElement('div'); card.className='card'; card.dataset.card=id;
+    card.innerHTML='<div class="row"><div><div class="name">'+def.name+'</div><span class="badge">Lvl '+lvl+'</span></div><div class="actions"><button '+(state.construction?'disabled':'')+' data-up="'+id+'" class="primary">Upgrade</button></div></div><div class="sub">'+(def.desc||'')+'</div><div class="costs"><span>Cost:</span><span>🪵 '+fmt(cost.wood||0)+'</span><span>🧱 '+fmt(cost.clay||0)+'</span><span>⛓️ '+fmt(cost.iron||0)+'</span><span>🥖 '+fmt(cost.food||0)+'</span><span>⏳ '+formatTime(timeMs)+'</span></div>';
+    c.appendChild(card);
+  }
+  const q=document.getElementById('build-queue');
+  if(state.construction){
+    const now=Date.now(), {id,start,finish,ms}=state.construction, pct=clamp((now-start)/ms,0,1)*100;
+    q.style.display=''; document.getElementById('bq-name').textContent=BUILDINGS[id].name;
+    document.getElementById('bq-bar').style.width=pct+'%';
+    document.getElementById('bq-eta').textContent='Finishes in '+formatTime(finish-now);
+  }else q.style.display='none';
+  c.querySelectorAll('button[data-up]').forEach(b=>b.onclick=()=>queueUpgrade(b.getAttribute('data-up')));
+}
+function renderTraining(){
+  const h=document.getElementById('training-cards'); h.innerHTML='';
+  for(const [t,u] of Object.entries(UNITS)){
+    const bId=u.building, bLvl=buildingLevel(bId), c=unitCost(t), ms=unitTimeMs(t);
+    const card=document.createElement('div'); card.className='card';
+    card.innerHTML='<div class="row"><div><div class="name">'+u.name+'</div><span class="badge">Lvl '+bLvl+' '+BUILDINGS[bId].name+'</span></div><div class="actions"><input type="number" min="1" value="1" id="qty-'+t+'"><button data-train="'+t+'" class="primary">Train</button></div></div><div class="costs"><span>Cost/unit:</span><span>🪵 '+fmt(c.wood)+'</span><span>🧱 '+fmt(c.clay)+'</span><span>⛓️ '+fmt(c.iron)+'</span><span>🥖 '+fmt(c.food)+'</span><span>⏳ '+formatTime(ms)+'</span><span>👥 '+u.pop+'</span></div>';
+    h.appendChild(card);
+  }
+  h.querySelectorAll('button[data-train]').forEach(b=>b.onclick=()=>{ const t=b.getAttribute('data-train'); const qty=parseInt(document.getElementById('qty-'+t).value||'0',10); queueTraining(t,qty); });
+  const qWrap=document.getElementById('train-queues'); qWrap.innerHTML='';
+  for(const q of state.training){
+    const pct=clamp((Date.now()-q.start)/q.perUnit,0,1)*100;
+    const d=document.createElement('div'); d.className='card';
+    d.innerHTML='<div class="row"><div class="name">Training '+UNITS[q.type].name+'</div><span class="badge">'+q.countLeft+' left</span></div><div style="height:10px;background:#eadfc3;border-radius:999px;overflow:hidden;border:1px solid var(--border)"><div style="height:100%;background:linear-gradient(90deg,#2f7a3e,#6ea85d);width:'+pct+'%"></div></div><div class="sub">Next in '+formatTime(q.finish-Date.now())+'</div>';
+    qWrap.appendChild(d);
+  }
+}
+function renderArmy(){
+  const body=document.getElementById('army-rows'); body.innerHTML='';
+  for(const [t,u] of Object.entries(UNITS)){
+    const n=state.units[t];
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td>'+u.name+'</td><td>'+fmt(n)+' <span class="sub">(idle)</span></td><td>'+u.atk+'</td><td>'+u.hp+'</td><td>'+u.pop+'</td>';
+    body.appendChild(tr);
+  }
+}
+function renderMissions(){
+  document.getElementById('tp-bonus').textContent=percent(townPlazaBonus());
+  document.getElementById('tp-speed').textContent=percent(townPlazaSpeed());
+  document.getElementById('wall-mit').textContent=percent(wallMitigation());
+  const m=state.mission, box=document.getElementById('mission-active');
+  if(m){
+    box.style.display=''; const now=Date.now(), pct=clamp((now-m.start)/(m.finish-m.start),0,1)*100;
+    document.getElementById('mq-bar').style.width=pct+'%';
+    document.getElementById('mq-eta').textContent='Returns in '+formatTime(m.finish-now);
+    document.getElementById('mission-dets').textContent='Diff '+m.diff;
+    const tb=document.getElementById('mq-waves'); tb.innerHTML='';
+    for(let i=0;i<m.waves.length;i++){ const w=m.waves[i]; const tr=document.createElement('tr'); tr.innerHTML='<td>'+(i+1)+'</td><td>'+fmt(w.power)+'</td><td>'+(w.result||'TBD')+'</td>'; tb.appendChild(tr); }
+  }else box.style.display='none';
+}
+function renderMissionLog(){
+  const list=document.getElementById('mission-log'); list.innerHTML='';
+  for(const e of state.missionLog){
+    const d=document.createElement('div'); d.className='card';
+    d.innerHTML='<div class="row"><div class="name">'+(e.success?'✅ Success':'❌ Failed')+'</div><span class="badge">Diff '+e.diff+'</span><span class="badge">'+e.time+'</span></div><div class="sub">Sent: '+Object.entries(e.sent).map(([t,n])=>UNITS[t].name+'×'+n).join(', ')+'</div><div class="sub">Casualties: '+Object.entries(e.casualties).map(([t,n])=>UNITS[t].name+'×'+n).join(', ')+'</div>'+ (e.success?'<div class="costs"><span>Loot:</span><span>🪵 '+fmt(e.reward.wood)+'</span><span>🧱 '+fmt(e.reward.clay)+'</span><span>⛓️ '+fmt(e.reward.iron)+'</span><span>🥖 '+fmt(e.reward.food)+'</span></div>':'') ;
+    list.appendChild(d);
+  }
+}
+function renderMarket(){ document.getElementById('trade-fee').textContent=percent(buildingEffects().fee)+'%'; }
+function render(){ renderResources(); renderBuildings(); renderTraining(); renderArmy(); renderMissions(); renderMarket(); update3DHover(); }
 
-function townPlazaBonus(){return buildingEffects().rewardBonus||0} function townPlazaSpeed(){return buildingEffects().missionSpeed||0} function wallMitigation(){return buildingEffects().mitigation||0}
-function calcMissionDurationMs(diff){let base=diff===1?45000:diff===2?60000:90000;base=Math.floor(base*(1-clamp(townPlazaSpeed(),0,0.7)));return base}
-function genWaves(diff){const waves=[];let base=75*diff;for(let i=1;i<=3;i++){const mult=Math.pow(1.55,i-1),j=0.9+Math.random()*0.2;waves.push({power:Math.floor(base*mult*j),result:null})}return waves}
-function sendMission(diff,send){if(state.mission)return alert('A mission is already active.');for(const t of Object.keys(UNITS)){if(send[t]>(state.units[t]||0))return alert(`Not enough ${UNITS[t].name}.`)}const popRes=Object.keys(send).reduce((a,t)=>a+send[t]*UNITS[t].pop,0);state.reservedPop+=popRes;for(const t in send){state.units[t]-=send[t]}const now=Date.now(),dur=calcMissionDurationMs(diff);state.mission={diff,send,start:now,finish:now+dur,waves:genWaves(diff),resolved:false,log:null}}
-function simulateMission(){const m=state.mission;if(!m)return;const cur=deepClone(m.send);const totalInitHP=Object.entries(cur).reduce((hp,[t,n])=>hp+n*UNITS[t].hp,0);let hp=totalInitHP*(1+wallMitigation());const atk=Object.entries(cur).reduce((a,[t,n])=>a+n*UNITS[t].atk,0);let success=true;for(let i=0;i<m.waves.length;i++){const w=m.waves[i];const under=Math.max(1,w.power/Math.max(1,atk));let dmg=w.power*under*(1-wallMitigation());hp-=dmg;const survived=hp>0;w.result=survived?'survived':'defeated';if(!survived){success=false;break}}const lost=Math.max(0,totalInitHP-Math.max(0,hp));let lossRatio=clamp(lost/Math.max(1,totalInitHP),0,0.95);const casualties={infantry:0,archer:0,cavalry:0};for(const t of Object.keys(cur)){const n=cur[t];const l=Math.min(n,Math.floor(n*lossRatio*(1-wallMitigation()*0.5)));casualties[t]=l;cur[t]-=l}const survivors=cur;let mult=1+townPlazaBonus();const base= m.diff===1?180:(m.diff===2?320:520);const reward={wood:Math.floor(base*mult*(0.9+Math.random()*0.3)),clay:Math.floor(base*mult*(0.9+Math.random()*0.3)),iron:Math.floor(base*mult*(0.9+Math.random()*0.3)),food:Math.floor(0.6*base*mult*(0.9+Math.random()*0.3))};return {success,casualties,survivors,reward}}
-function finalizeMission(){const m=state.mission;if(!m)return;const res=simulateMission();const sentPop=Object.entries(m.send).reduce((a,[t,n])=>a+n*UNITS[t].pop,0);state.reservedPop-=sentPop;for(const t in res.survivors){state.units[t]+=res.survivors[t]}if(res.success){for(const k in res.reward){state.resources[k]+=res.reward[k]}}const entry={time:new Date().toLocaleString(),diff:m.diff,success:res.success,sent:m.send,casualties:res.casualties,reward:res.success?res.reward:null,waves:m.waves.map(w=>({power:w.power,result:w.result}))};state.missionLog.unshift(entry);state.missionLog=state.missionLog.slice(0,6);state.mission=null;renderMissionLog();alert(res.success?`Mission success! Loot: +${fmt(entry.reward.wood)} wood, +${fmt(entry.reward.clay)} clay, +${fmt(entry.reward.iron)} iron, +${fmt(entry.reward.food)} food.`:'Mission failed.')}
+/* ===== UI wiring ===== */
+document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); const t=b.dataset.tab; ['units','missions','market','army','help'].forEach(id=>{ document.getElementById('tab-'+id).style.display=(id===t)?'':'none'; }); });
+document.getElementById('btn-save').onclick=()=>{ saveState(); alert('Game saved!'); };
+document.getElementById('btn-reset').onclick=()=>{ if(confirm('Wipe your save and restart?')){ localStorage.removeItem('vw-save-iso-clean'); state=deepClone(DEFAULT_STATE); init3DStateSync(); } };
+document.getElementById('btn-trade').onclick=()=>{ const f=document.getElementById('trade-from').value, t=document.getElementById('trade-to').value; if(f===t) return alert('Pick different resources.'); const a=parseInt(document.getElementById('trade-amt').value||'0',10); if(a<=0) return; if(state.resources[f]<a) return alert('Not enough to trade.'); const fee=buildingEffects().fee; const r=Math.floor(a*(1-fee)); state.resources[f]-=a; state.resources[t]+=r; renderResources(); renderMarket(); };
+document.getElementById('btn-send-mission').onclick=()=>{ const diff=parseInt(document.getElementById('mission-diff').value,10); const send={ infantry:parseInt(document.getElementById('send-infantry').value||'0',10), archer:parseInt(document.getElementById('send-archer').value||'0',10), cavalry:parseInt(document.getElementById('send-cavalry').value||'0',10) }; const tot=send.infantry+send.archer+send.cavalry; if(tot<=0) return alert('Send at least one unit.'); sendMission(diff,send); document.getElementById('send-infantry').value=0; document.getElementById('send-archer').value=0; document.getElementById('send-cavalry').value=0; renderMissions(); };
 
-let lastTick=Date.now();
-function gameTick(){const now=Date.now(),dt=(now-lastTick)/1000;lastTick=now;const prod=prodPerSec();for(const k of ['wood','clay','iron','food']){state.resources[k]+=(prod[k]||0)*dt}tickConstruction(now);tickTraining(now);if(state.mission&&now>=state.mission.finish){finalizeMission()}state.timePlayedMs+=dt*1000;autosave(dt);render();requestAnimationFrame(gameTick)}
-let autosaveTimer=0;function autosave(dt){autosaveTimer+=dt;if(autosaveTimer>=10){saveState();autosaveTimer=0}}
-
-function renderResources(){const p=prodPerSec();document.getElementById('r-wood').textContent=fmt(state.resources.wood);document.getElementById('r-clay').textContent=fmt(state.resources.clay);document.getElementById('r-iron').textContent=fmt(state.resources.iron);document.getElementById('r-food').textContent=fmt(state.resources.food);document.getElementById('p-wood').textContent=`+${p.wood.toFixed(2)}/s`;document.getElementById('p-clay').textContent=`+${p.clay.toFixed(2)}/s`;document.getElementById('p-iron').textContent=`+${p.iron.toFixed(2)}/s`;document.getElementById('p-food').textContent=`+${p.food.toFixed(2)}/s`;document.getElementById('clock').textContent=formatTime(state.timePlayedMs);document.getElementById('pop').textContent=`${idlePopulation()}/${totalPopulationCap()}`}
-function renderBuildings(){const c=document.getElementById('buildings');c.innerHTML='';for(const [id,def] of Object.entries(BUILDINGS)){const lvl=buildingLevel(id),cost=getBuildCost(id),timeMs=getBuildTimeMs(id);const card=document.createElement('div');card.className='card';card.dataset.card=id;card.innerHTML=`<div class="row"><div><div class="name">${def.name}</div><span class="badge">Lvl ${lvl}</span></div><div class="actions"><button ${state.construction?'disabled':''} data-up="${id}" class="primary">Upgrade</button></div></div><div class="sub">${def.desc||''}</div><div class="costs"><span>Cost:</span><span>🪵 ${fmt(cost.wood||0)}</span><span>🧱 ${fmt(cost.clay||0)}</span><span>⛓️ ${fmt(cost.iron||0)}</span><span>🥖 ${fmt(cost.food||0)}</span><span>⏳ ${formatTime(timeMs)}</span></div>`;c.appendChild(card)}const q=document.getElementById('build-queue');if(state.construction){const now=Date.now(),{id,start,finish,ms}=state.construction,pct=clamp((now-start)/ms,0,1)*100;q.style.display='';document.getElementById('bq-name').textContent=BUILDINGS[id].name;document.getElementById('bq-bar').style.width=`${pct}%`;document.getElementById('bq-eta').textContent=`Finishes in ${formatTime(finish-now)}`}else{q.style.display='none'}c.querySelectorAll('button[data-up]').forEach(b=>b.onclick=()=>queueUpgrade(b.getAttribute('data-up')))}
-function renderTraining(){const h=document.getElementById('training-cards');h.innerHTML='';for(const [t,u] of Object.entries(UNITS)){const bId=u.building,bLvl=buildingLevel(bId),c=unitCost(t),ms=unitTimeMs(t);const card=document.createElement('div');card.className='card';card.innerHTML=`<div class="row"><div><div class="name">${u.name}</div><span class="badge">Lvl ${bLvl} ${BUILDINGS[bId].name}</span></div><div class="actions"><input type="number" min="1" value="1" id="qty-${t}"><button data-train="${t}" class="primary">Train</button></div></div><div class="costs"><span>Cost/unit:</span><span>🪵 ${fmt(c.wood)}</span><span>🧱 ${fmt(c.clay)}</span><span>⛓️ ${fmt(c.iron)}</span><span>🥖 ${fmt(c.food)}</span><span>⏳ ${formatTime(ms)}</span><span>👥 ${u.pop}</span></div>`;h.appendChild(card)}h.querySelectorAll('button[data-train]').forEach(b=>b.onclick=()=>{const t=b.getAttribute('data-train');const qty=parseInt(document.getElementById(`qty-${t}`).value||'0',10);queueTraining(t,qty)});const qWrap=document.getElementById('train-queues');qWrap.innerHTML='';for(const q of state.training){const pct=clamp((Date.now()-q.start)/q.perUnit,0,1)*100;const item=document.createElement('div');item.className='card';item.innerHTML=`<div class="row"><div class="name">Training ${UNITS[q.type].name}</div><span class="badge">${q.countLeft} left</span></div><div style="height:10px;background:#eadfc3;border-radius:999px;overflow:hidden;border:1px solid var(--border)"><div style="height:100%;background:linear-gradient(90deg,#2f7a3e,#6ea85d);width:${pct}%"></div></div><div class="sub">Next in ${formatTime(q.finish-Date.now())}</div>`;qWrap.appendChild(item)}}
-function renderArmy(){const body=document.getElementById('army-rows');body.innerHTML='';for(const [t,u] of Object.entries(UNITS)){const n=state.units[t];const tr=document.createElement('tr');tr.innerHTML=`<td>${u.name}</td><td>${fmt(n)} <span class="sub">(idle)</span></td><td>${u.atk}</td><td>${u.hp}</td><td>${u.pop}</td>`;body.appendChild(tr)}}
-function renderMissions(){document.getElementById('tp-bonus').textContent=percent(townPlazaBonus());document.getElementById('tp-speed').textContent=percent(townPlazaSpeed());document.getElementById('wall-mit').textContent=percent(wallMitigation());const m=state.mission,box=document.getElementById('mission-active');if(m){box.style.display='';const now=Date.now(),pct=clamp((now-m.start)/(m.finish-m.start),0,1)*100;document.getElementById('mq-bar').style.width=`${pct}%`;document.getElementById('mq-eta').textContent=`Returns in ${formatTime(m.finish-now)}`;document.getElementById('mission-dets').textContent=`Diff ${m.diff}`;const tb=document.getElementById('mq-waves');tb.innerHTML='';for(let i=0;i<m.waves.length;i++){const w=m.waves[i];const tr=document.createElement('tr');tr.innerHTML=`<td>${i+1}</td><td>${fmt(w.power)}</td><td>${w.result||'TBD'}</td>`;tb.appendChild(tr)}}else box.style.display='none'}
-function renderMissionLog(){const list=document.getElementById('mission-log');list.innerHTML='';for(const e of state.missionLog){const d=document.createElement('div');d.className='card';d.innerHTML=`<div class="row"><div class="name">${e.success?'✅ Success':'❌ Failed'}</div><span class="badge">Diff ${e.diff}</span><span class="badge">${e.time}</span></div><div class="sub">Sent: ${Object.entries(e.sent).map(([t,n])=>`${UNITS[t].name}×${n}`).join(', ')}</div><div class="sub">Casualties: ${Object.entries(e.casualties).map(([t,n])=>`${UNITS[t].name}×${n}`).join(', ')}</div>${e.success?`<div class="costs"><span>Loot:</span><span>🪵 ${fmt(e.reward.wood)}</span><span>🧱 ${fmt(e.reward.clay)}</span><span>⛓️ ${fmt(e.reward.iron)}</span><span>🥖 ${fmt(e.reward.food)}</span></div>`:''}`;list.appendChild(d)}}
-function render(){renderResources();renderBuildings();renderTraining();renderArmy();renderMissions();renderMarket();}
-function renderMarket(){const fee=buildingEffects().fee;document.getElementById('trade-fee').textContent=percent(fee)+'%'}
-
-document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');const t=b.dataset.tab;['units','missions','market','army','help'].forEach(id=>{document.getElementById('tab-'+id).style.display=(id===t)?'':'none'})});
-document.getElementById('btn-save').onclick=()=>{saveState();alert('Game saved!')};
-document.getElementById('btn-reset').onclick=()=>{if(confirm('Wipe your save and restart?')){localStorage.removeItem('vw-save-3d-iso');state=deepClone(DEFAULT_STATE);init3DStateSync()}};
-document.getElementById('btn-trade').onclick=()=>{const f=document.getElementById('trade-from').value,t=document.getElementById('trade-to').value;if(f===t)return alert('Pick different resources.');const a=parseInt(document.getElementById('trade-amt').value||'0',10);if(a<=0)return;if(state.resources[f]<a)return alert('Not enough to trade.');const fee=buildingEffects().fee;const r=Math.floor(a*(1-fee));state.resources[f]-=a;state.resources[t]+=r;renderResources();renderMarket()};
-document.getElementById('btn-send-mission').onclick=()=>{const diff=parseInt(document.getElementById('mission-diff').value,10);const send={infantry:parseInt(document.getElementById('send-infantry').value||'0',10),archer:parseInt(document.getElementById('send-archer').value||'0',10),cavalry:parseInt(document.getElementById('send-cavalry').value||'0',10)};const tot=send.infantry+send.archer+send.cavalry;if(tot<=0)return alert('Send at least one unit.');sendMission(diff,send);document.getElementById('send-infantry').value=0;document.getElementById('send-archer').value=0;document.getElementById('send-cavalry').value=0;renderMissions()};
-
-/* ===== 3D VIEW (Orthographic, locked) ===== */
-let renderer,scene,camera,raycaster,mouse; const meshes={}; const labelTip=document.getElementById('hover-tip');
+/* ===== 3D (Orthographic, locked camera) ===== */
+let renderer, scene, camera, raycaster, mouse; const meshes={}; const tip=document.getElementById('hover-tip');
 function init3D(){
-  if(!window.THREE){ document.getElementById('three-warning').style.display='block'; return; }
-  const el=document.getElementById('scene3d');
-  scene=new THREE.Scene(); scene.fog=new THREE.Fog(0x9fcf7a,50,140);
-  const w=el.clientWidth,h=el.clientHeight;
-  // Orthographic camera for a TW-like look (weak perspective) and locked angle
-  const frustum=22; const aspect=w/h;
-  camera=new THREE.OrthographicCamera(-frustum*aspect,frustum*aspect,frustum,-frustum,0.1,500);
-  // Position: around 35° elevation, slightly off-center; like your screenshot
-  camera.position.set(46, 28, 34);
-  camera.lookAt(0, 4, 0);
-  camera.zoom=1.4; camera.updateProjectionMatrix();
-
-  renderer=new THREE.WebGLRenderer({antialias:true,alpha:false}); renderer.setClearColor(0x9ed0ff,1);
-  renderer.setSize(w,h); renderer.setPixelRatio(window.devicePixelRatio||1); el.appendChild(renderer.domElement);
-
-  // Lights
-  const sun=new THREE.DirectionalLight(0xffffff,1.0); sun.position.set(40,60,30); scene.add(sun);
-  scene.add(new THREE.AmbientLight(0xf7e9c8,0.7));
-
-  // Ground (plateau)
-  const ground=new THREE.Mesh(new THREE.CylinderGeometry(30,30,1,80), new THREE.MeshLambertMaterial({color:0x8eb96f}));
-  ground.position.y=-0.5; scene.add(ground);
-
-  // Paths around plaza
-  const pathMat=new THREE.MeshLambertMaterial({color:0xe1cfaa});
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(12,0.7,16,64), pathMat); ring.rotation.x=Math.PI/2; ring.position.y=0.1; scene.add(ring);
-  const spokes=new THREE.Group();
-  for(let a=0;a<6;a++){ const seg=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.2,9), pathMat); seg.position.set(Math.cos(a*Math.PI/3)*6,0.1,Math.sin(a*Math.PI/3)*6); seg.lookAt(0,0.1,0); spokes.add(seg) } scene.add(spokes);
-
-  // Palisade posts
-  const posts=new THREE.Group(); const postGeo=new THREE.CylinderGeometry(0.28,0.36,4,6); const postMat=new THREE.MeshLambertMaterial({color:0x7a5a32});
-  const count=72,R=26.5; for(let i=0;i<count;i++){ const a=i/count*Math.PI*2; const m=new THREE.Mesh(postGeo,postMat); m.position.set(Math.cos(a)*R,1.8,Math.sin(a)*R); m.rotation.y=-a; posts.add(m) } scene.add(posts);
-
-  // Simple plaza
-  const plaza=new THREE.Mesh(new THREE.CylinderGeometry(5.2,5.2,0.2,32), new THREE.MeshLambertMaterial({color:0xe6d6b7})); plaza.position.y=0; scene.add(plaza);
-
-  // Building layout
-  const order=['townCenter','townPlaza','lumbermill','clayMine','ironMine','farm','houses','market','barracks','archerCamp','stable','wall'];
-  const radius=18;
-  order.forEach((id,idx)=>{ const ang=(idx/order.length)*Math.PI*2 + Math.PI/10; const x=Math.cos(ang)*radius, z=Math.sin(ang)*radius; const g=makeBuildingMesh(id); g.position.set(x,0,z); g.lookAt(0,0,0); scene.add(g); meshes[id]=g });
-
-  // Extra deco: sparse trees and rocks
-  const deco=new THREE.Group(); const treeTrunk=new THREE.CylinderGeometry(0.25,0.35,1.2,6); const leaves=new THREE.ConeGeometry(0.8,1.6,8);
-  for(let i=0;i<18;i++){ const a=Math.random()*Math.PI*2, r= 14 + Math.random()*12; const t=new THREE.Mesh(treeTrunk,new THREE.MeshLambertMaterial({color:0x7a5a32})); t.position.set(Math.cos(a)*r,0.6,Math.sin(a)*r); deco.add(t); const c=new THREE.Mesh(leaves,new THREE.MeshLambertMaterial({color:0x3c7a3a})); c.position.set(t.position.x,1.7,t.position.z); deco.add(c) }
-  const rockG=new THREE.IcosahedronGeometry(0.6,0); const rockM=new THREE.MeshLambertMaterial({color:0xa8a8b0}); for(let i=0;i<10;i++){ const a=Math.random()*Math.PI*2, r=16+Math.random()*10; const k=new THREE.Mesh(rockG,rockM); k.position.set(Math.cos(a)*r,0.2,Math.sin(a)*r); k.scale.setScalar(0.6+Math.random()*0.8); deco.add(k) }
-  scene.add(deco);
-
-  raycaster=new THREE.Raycaster(); mouse=new THREE.Vector2();
-  el.addEventListener('mousemove',e=>{const rect=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-rect.left)/rect.width)*2-1; mouse.y= -((e.clientY-rect.top)/rect.height)*2+1;});
-  el.addEventListener('click',on3DClick);
-  window.addEventListener('resize',()=>{const w2=el.clientWidth,h2=el.clientHeight; camera.left=-frustum* (w2/h2); camera.right=frustum*(w2/h2); camera.top=frustum; camera.bottom=-frustum; camera.updateProjectionMatrix(); renderer.setSize(w2,h2)});
-  animate3D();
+  try{
+    const el=document.getElementById('scene3d');
+    scene=new THREE.Scene(); scene.fog=new THREE.Fog(0x9fcf7a,50,140);
+    const w=el.clientWidth,h=el.clientHeight; const frustum=22, aspect=w/h;
+    camera=new THREE.OrthographicCamera(-frustum*aspect,frustum*aspect,frustum,-frustum,0.1,500);
+    camera.position.set(46,28,34); camera.lookAt(0,4,0); camera.zoom=1.4; camera.updateProjectionMatrix();
+    renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setSize(w,h); renderer.setPixelRatio(window.devicePixelRatio||1); el.appendChild(renderer.domElement);
+    const sun=new THREE.DirectionalLight(0xffffff,1.0); sun.position.set(40,60,30); scene.add(sun); scene.add(new THREE.AmbientLight(0xf7e9c8,0.7));
+    const ground=new THREE.Mesh(new THREE.CylinderGeometry(30,30,1,80), new THREE.MeshLambertMaterial({color:0x8eb96f})); ground.position.y=-0.5; scene.add(ground);
+    const pathMat=new THREE.MeshLambertMaterial({color:0xe1cfaa}); const ring=new THREE.Mesh(new THREE.TorusGeometry(12,0.7,16,64), pathMat); ring.rotation.x=Math.PI/2; ring.position.y=0.1; scene.add(ring);
+    const spokes=new THREE.Group(); for(let a=0;a<6;a++){ const seg=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.2,9), pathMat); seg.position.set(Math.cos(a*Math.PI/3)*6,0.1,Math.sin(a*Math.PI/3)*6); seg.lookAt(0,0.1,0); spokes.add(seg) } scene.add(spokes);
+    const posts=new THREE.Group(); const postGeo=new THREE.CylinderGeometry(0.28,0.36,4,6); const postMat=new THREE.MeshLambertMaterial({color:0x7a5a32}); const count=72,R=26.5;
+    for(let i=0;i<count;i++){ const a=i/count*Math.PI*2; const m=new THREE.Mesh(postGeo,postMat); m.position.set(Math.cos(a)*R,1.8,Math.sin(a)*R); m.rotation.y=-a; posts.add(m) } scene.add(posts);
+    const plaza=new THREE.Mesh(new THREE.CylinderGeometry(5.2,5.2,0.2,32), new THREE.MeshLambertMaterial({color:0xe6d6b7})); plaza.position.y=0; scene.add(plaza);
+    const order=['townCenter','townPlaza','lumbermill','clayMine','ironMine','farm','houses','market','barracks','archerCamp','stable','wall'];
+    const radius=18;
+    order.forEach((id,idx)=>{ const ang=(idx/order.length)*Math.PI*2 + Math.PI/10; const x=Math.cos(ang)*radius, z=Math.sin(ang)*radius; const g=makeBuildingMesh(id); g.position.set(x,0,z); g.lookAt(0,0,0); scene.add(g); meshes[id]=g; });
+    // Deco
+    const deco=new THREE.Group(); const trunk=new THREE.CylinderGeometry(0.25,0.35,1.2,6); const leaves=new THREE.ConeGeometry(0.8,1.6,8);
+    for(let i=0;i<18;i++){ const a=Math.random()*Math.PI*2, r=14+Math.random()*12; const t=new THREE.Mesh(trunk,new THREE.MeshLambertMaterial({color:0x7a5a32})); t.position.set(Math.cos(a)*r,0.6,Math.sin(a)*r); deco.add(t); const c=new THREE.Mesh(leaves,new THREE.MeshLambertMaterial({color:0x3c7a3a})); c.position.set(t.position.x,1.7,t.position.z); deco.add(c) }
+    const rockG=new THREE.IcosahedronGeometry(0.6,0); const rockM=new THREE.MeshLambertMaterial({color:0xa8a8b0}); for(let i=0;i<10;i++){ const a=Math.random()*Math.PI*2, r=16+Math.random()*10; const k=new THREE.Mesh(rockG,rockM); k.position.set(Math.cos(a)*r,0.2,Math.sin(a)*r); k.scale.setScalar(0.6+Math.random()*0.8); deco.add(k) }
+    scene.add(deco);
+    raycaster=new THREE.Raycaster(); mouse=new THREE.Vector2();
+    el.addEventListener('mousemove',e=>{const rect=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-rect.left)/rect.width)*2-1; mouse.y= -((e.clientY-rect.top)/rect.height)*2+1;});
+    el.addEventListener('click',on3DClick);
+    window.addEventListener('resize',()=>{const w2=el.clientWidth,h2=el.clientHeight; camera.left=-frustum*(w2/h2); camera.right=frustum*(w2/h2); camera.top=frustum; camera.bottom=-frustum; camera.updateProjectionMatrix(); renderer.setSize(w2,h2) });
+    animate3D();
+  }catch(e){
+    document.getElementById('three-warning').style.display='block'; console.error(e);
+  }
 }
-function makeRoof(radius,height,color){const r=new THREE.Mesh(new THREE.ConeGeometry(radius, height, 4), new THREE.MeshLambertMaterial({color})); r.rotation.y=Math.PI/4; r.position.y=2.1; return r}
-function updateBuildingMeshScale(g,lvl){const s=0.9+lvl*0.08; g.scale.set(s, 0.9+lvl*0.12, s)}
+function makeRoof(radius,height,color){ const r=new THREE.Mesh(new THREE.ConeGeometry(radius,height,4), new THREE.MeshLambertMaterial({color})); r.rotation.y=Math.PI/4; r.position.y=2.1; return r; }
+function updateBuildingMeshScale(g,lvl){ const s=0.9 + lvl*0.08; g.scale.set(s,0.9+lvl*0.12,s); }
 function makeBuildingMesh(id){
-  const group=new THREE.Group(); const lvl=buildingLevel(id); const wood=0x835634, stone=0x9a9a9a, roof=0xaa3a2a, thatch=0xcbb44a, canvas=0xe8d3a3;
+  const group=new THREE.Group(); const lvl=buildingLevel(id);
   const base=new THREE.Mesh(new THREE.CylinderGeometry(2.6,2.6,0.35,16), new THREE.MeshLambertMaterial({color:0xd9c79c})); base.position.y=0.175; group.add(base);
+  const wood=0x835634, stone=0x9a9a9a, roof=0xaa3a2a, thatch=0xcbb44a, canvas=0xe8d3a3;
   let core;
   switch(id){
     case 'townCenter': core=new THREE.Mesh(new THREE.BoxGeometry(3.2,3.2,3.2), new THREE.MeshLambertMaterial({color:stone})); core.position.y=1.8; group.add(core); group.add(makeRoof(2.0,1.2,roof)); break;
@@ -345,26 +530,32 @@ function makeBuildingMesh(id){
   }
   updateBuildingMeshScale(group,lvl); group.userData.id=id; return group;
 }
-function updateBuildingMesh(id){const g=meshes[id]; if(!g)return; updateBuildingMeshScale(g,buildingLevel(id))}
+function updateBuildingMesh(id){ const g=meshes[id]; if(!g) return; updateBuildingMeshScale(g,buildingLevel(id)); }
 function animate3D(){
   requestAnimationFrame(animate3D);
   if(!renderer) return;
-  // hover
   raycaster.setFromCamera(mouse,camera);
   const hits=raycaster.intersectObjects(Object.values(meshes),true);
-  if(hits.length>0){ let p=hits[0].object; while(p && !p.userData.id) p=p.parent; if(p && p.userData.id){ labelTip.style.display='block'; labelTip.textContent=BUILDINGS[p.userData.id].name+' — Lvl '+buildingLevel(p.userData.id); } } else { labelTip.style.display='none' }
+  if(hits.length>0){ let p=hits[0].object; while(p && !p.userData.id) p=p.parent; if(p && p.userData.id){ tip.style.display='block'; tip.textContent=BUILDINGS[p.userData.id].name+' — Lvl '+buildingLevel(p.userData.id); } } else { tip.style.display='none' }
   renderer.render(scene,camera);
 }
-function on3DClick(e){ const rect=renderer.domElement.getBoundingClientRect(); const mx=((e.clientX-rect.left)/rect.width)*2-1; const my= -((e.clientY-rect.top)/rect.height)*2+1; raycaster.setFromCamera({x:mx,y:my},camera); const hits=raycaster.intersectObjects(Object.values(meshes),true); if(hits.length>0){ let p=hits[0].object; while(p && !p.userData.id) p=p.parent; if(p && p.userData.id){ const id=p.userData.id; const card=document.querySelector('[data-card="'+id+'"]'); if(card){ card.scrollIntoView({behavior:'smooth',block:'center'}); card.style.outline='3px solid #2f7a3e'; setTimeout(()=>card.style.outline='',1200) }}}}
-function init3DStateSync(){ Object.keys(meshes).forEach(id=>updateBuildingMesh(id)) }
+function on3DClick(e){
+  const rect=renderer.domElement.getBoundingClientRect();
+  const mx=((e.clientX-rect.left)/rect.width)*2-1;
+  const my= -((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera({x:mx,y:my}, camera);
+  const hits=raycaster.intersectObjects(Object.values(meshes),true);
+  if(hits.length>0){ let p=hits[0].object; while(p && !p.userData.id) p=p.parent; if(p && p.userData.id){ const id=p.userData.id; const card=document.querySelector('[data-card="'+id+'"]'); if(card){ card.scrollIntoView({behavior:'smooth',block:'center'}); card.style.outline='3px solid #2f7a3e'; setTimeout(()=>card.style.outline='',1200) } } }
+}
+function update3DHover(){ /* Nothing extra for now */ }
+function init3DStateSync(){ Object.keys(meshes).forEach(id=>updateBuildingMesh(id)); }
 
-/* boot */
-(function boot(){
-  try{ init3D(); }catch(e){ document.getElementById('three-warning').style.display='block'; console.error(e); }
-  window.addEventListener('beforeunload', saveState);
-  render();
-  requestAnimationFrame(gameTick);
-})();
+/* ===== Boot ===== */
+function renderMarket(){ document.getElementById('trade-fee').textContent=percent(buildingEffects().fee)+'%'; }
+window.addEventListener('beforeunload', saveState);
+init3D();
+render();
+requestAnimationFrame(gameTick);
 </script>
 </body>
 </html>
