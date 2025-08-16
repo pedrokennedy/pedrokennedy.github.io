@@ -3,76 +3,111 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Village Wars — Single-File Prototype</title>
+<title>Village Wars — 3D Isometric</title>
 <style>
   :root{
-    --bg:#0f1221;--panel:#171a2e;--muted:#aab0d1;--text:#e9ecff;--accent:#6dd17c;--warn:#ffb84d;--danger:#ff5d6c;--blue:#6db6ff;
-    --border:rgba(255,255,255,0.08);
+    --bg:#e9dec1;            /* parchment */
+    --bg2:#efe6cf;
+    --panel:#f7f0db;
+    --wood:#8b5a2b;
+    --wood-dark:#5d3b1a;
+    --ink:#3a2a17;
+    --muted:#6f5a40;
+    --accent:#2f7a3e;
+    --warn:#b8741a;
+    --danger:#ae2c2c;
+    --border:#d2c3a3;
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Inter,Arial,sans-serif;background:linear-gradient(180deg,#0d1120,#0f1326 40%,#0b0f1f);}
-  header{position:sticky;top:0;z-index:10;background:rgba(15,18,33,.9);backdrop-filter:saturate(1.3) blur(8px);border-bottom:1px solid var(--border)}
-  .wrap{max-width:1200px;margin:0 auto;padding:12px 16px}
+  body{
+    margin:0;
+    font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Inter,Arial,sans-serif;
+    background: radial-gradient(1200px 600px at 50% -200px, #fffdf6, var(--bg)) fixed;
+    color:var(--ink);
+  }
+  header{
+    position:sticky;top:0;z-index:20;
+    background:linear-gradient(180deg,#fffdf5 0,#f7edd6 100%);
+    border-bottom:4px solid var(--wood);
+    box-shadow:0 8px 0 0 var(--wood-dark);
+  }
+  .wrap{max-width:1220px;margin:0 auto;padding:10px 16px}
   .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
-  .brand{font-weight:800;letter-spacing:.3px;color:var(--text)}
-  .pill{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--border);padding:8px 10px;border-radius:10px;color:var(--text);font-size:14px}
-  .pill b{font-weight:700}
+  .brand{font-weight:900;letter-spacing:.5px;color:var(--wood-dark);text-shadow:0 2px #f6e9ce}
+  .res{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}
+  .pill{
+    display:flex;gap:8px;align-items:center;
+    background:var(--panel);
+    border:1px solid var(--border);
+    padding:7px 10px;border-radius:10px;
+    font-size:14px;
+    box-shadow:inset 0 -1px #fff, 0 2px 0 0 #d8caa8;
+  }
+  .pill b{font-weight:800}
   .pill small{color:var(--muted)}
-  .res{display:flex;gap:10px;flex-wrap:wrap}
-  .res .pill{min-width:150px;justify-content:space-between}
-  .cap{color:var(--muted);font-size:12px}
-  main .wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+  main .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
   @media (max-width:980px){main .wrap{grid-template-columns:1fr}}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px; padding:14px}
-  h2,h3{margin:6px 0 10px;color:var(--text)}
-  p,li,td,th,button,label,span,input,select{color:var(--text)}
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:12px;
+    box-shadow:0 6px 0 0 #dacbad;
+  }
+  h2,h3{margin:6px 0 10px}
   .sub{color:var(--muted);font-size:13px;margin:4px 0 10px}
   .list{display:grid;gap:10px}
-  .card{border:1px solid var(--border);border-radius:12px;padding:12px;background:rgba(255,255,255,0.02)}
+  .card{
+    border:1px solid var(--border);border-radius:12px;padding:12px;background:#fffaf0;
+    box-shadow:inset 0 1px #fff, 0 2px 0 0 #e0d2b3;
+  }
   .card .row{justify-content:space-between}
-  .name{font-weight:700}
-  .badge{font-size:12px;color:#c6ceff;background:#23284a;border:1px solid var(--border);border-radius:999px;padding:3px 8px}
+  .name{font-weight:800}
+  .badge{font-size:12px;color:#fff;background:var(--wood);border:1px solid var(--wood-dark);border-radius:999px;padding:3px 8px}
   .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  button{cursor:pointer;border:1px solid var(--border);background:#1f2450;color:var(--text);padding:8px 12px;border-radius:10px;font-weight:600}
-  button.primary{background:linear-gradient(180deg,#2a7,#186);border-color:#1a8a62}
-  button.warn{background:linear-gradient(180deg,#e3a33b,#b0781d);border-color:#b0781d}
-  button.danger{background:linear-gradient(180deg,#f46,#b33);border-color:#b33}
-  button:disabled{opacity:.55;cursor:not-allowed}
+  button{
+    cursor:pointer;border:2px solid var(--wood-dark);color:#fff;padding:7px 12px;border-radius:10px;font-weight:800;
+    background:linear-gradient(180deg,#7e4f24,#5d3b1a);
+  }
+  button.primary{background:linear-gradient(180deg,#3e8c4b,#2f7a3e)}
+  button.warn{background:linear-gradient(180deg,#c9862c,#a0671c)}
+  button.danger{background:linear-gradient(180deg,#c24242,#a32a2a)}
+  button:disabled{filter:grayscale(.7) brightness(.9);cursor:not-allowed}
   .costs{display:flex;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
-  .costs span{background:#222641;border:1px solid var(--border);border-radius:8px;padding:3px 8px}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-  .table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border-radius:10px;border:1px solid var(--border)}
+  .costs span{background:#f1e6cd;border:1px solid var(--border);border-radius:8px;padding:3px 8px}
+  .table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border-radius:10px;border:1px solid var(--border);background:#fffaf0}
   .table th,.table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;font-size:14px}
   .table tr:last-child td{border-bottom:none}
-  .muted{color:var(--muted)}
-  .progress{height:10px;background:#22274a;border-radius:999px;overflow:hidden;border:1px solid var(--border)}
-  .bar{height:100%;background:linear-gradient(90deg,#6dd17c,#6db6ff)}
+  input[type="number"],select{
+    background:#faf2db;border:1px solid var(--border);border-radius:8px;padding:7px 8px;
+  }
   .tabs{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
-  .tabs button{background:#1a1f3e}
-  .tabs button.active{background:#25307a;border-color:#335dc6}
-  .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  input[type="number"]{background:#141836;border:1px solid var(--border);border-radius:8px;padding:7px 8px;width:90px}
-  select{background:#141836;border:1px solid var(--border);border-radius:8px;padding:7px 8px}
-  .footer{font-size:12px;color:var(--muted)}
+  .tabs button{background:linear-gradient(180deg,#a17b4d,#7a5a32)}
+  .tabs button.active{background:linear-gradient(180deg,#3e8c4b,#2f7a3e);border-color:#20582a}
   .right{justify-content:flex-end}
-  .split{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .help{font-size:13px;color:var(--muted)}
-  .tag{font-size:12px;padding:2px 6px;border:1px solid var(--border);border-radius:6px;background:#1a1f3e}
-  .good{color:var(--accent)} .warnc{color:var(--warn)} .bad{color:var(--danger)}
+  #scene3d{
+    height:430px;border:3px solid var(--wood);border-radius:12px; background:linear-gradient(#9ed0ff,#9ed0ff 60%,#9fcf7a 60%, #8ab765);
+    box-shadow:inset 0 2px #fff, 0 3px 0 0 #d7c8a8;
+    position:relative;
+  }
+  #hover-tip{
+    position:absolute;top:8px;left:8px;pointer-events:none;
+    background:rgba(255,255,255,.9);border:1px solid var(--border);padding:6px 8px;border-radius:8px;font-size:12px;display:none;
+  }
+  .footer{font-size:12px;color:var(--muted)}
 </style>
 </head>
 <body>
 <header>
   <div class="wrap row">
     <div class="brand">🏰 Village Wars</div>
-    <div class="res row">
-      <div class="pill"><span>Wood</span><b id="r-wood">0</b><small id="p-wood" class="cap">+0/s</small></div>
-      <div class="pill"><span>Clay</span><b id="r-clay">0</b><small id="p-clay" class="cap">+0/s</small></div>
-      <div class="pill"><span>Iron</span><b id="r-iron">0</b><small id="p-iron" class="cap">+0/s</small></div>
-      <div class="pill"><span>Food</span><b id="r-food">0</b><small id="p-food" class="cap">+0/s</small></div>
-      <div class="pill"><span>Population</span><b id="pop">0/0</b><small id="upkeep" class="cap">used</small></div>
-      <div class="pill"><span>Time</span><b id="clock">00:00:00</b><small class="cap">in-game</small></div>
+    <div class="res">
+      <div class="pill"><span>Wood</span><b id="r-wood">0</b><small id="p-wood">+0/s</small></div>
+      <div class="pill"><span>Clay</span><b id="r-clay">0</b><small id="p-clay">+0/s</small></div>
+      <div class="pill"><span>Iron</span><b id="r-iron">0</b><small id="p-iron">+0/s</small></div>
+      <div class="pill"><span>Food</span><b id="r-food">0</b><small id="p-food">+0/s</small></div>
+      <div class="pill"><span>Population</span><b id="pop">0/0</b></div>
+      <div class="pill"><span>Time</span><b id="clock">00:00:00</b></div>
     </div>
     <div class="row right">
       <button id="btn-save" class="primary">Save</button>
@@ -83,19 +118,12 @@
 
 <main>
   <div class="wrap">
-    <!-- BUILDINGS -->
     <section class="panel">
-      <h2>Buildings</h2>
-      <div class="sub">Upgrade to unlock features and increase production. Town Center speeds construction; Wall reduces mission casualties.</div>
-      <div id="buildings" class="list"></div>
-      <div id="build-queue" class="card" style="margin-top:10px;display:none">
-        <div class="row"><div class="name">Construction Queue</div><span class="tag" id="bq-name"></span></div>
-        <div class="progress" style="margin-top:6px"><div id="bq-bar" class="bar" style="width:0%"></div></div>
-        <div class="sub" id="bq-eta">—</div>
-      </div>
+      <h2>Village View</h2>
+      <div class="sub">Locked 3D camera, buildings around a palisade. Click a building to focus its card.</div>
+      <div id="scene3d"><div id="hover-tip"></div></div>
     </section>
 
-    <!-- RIGHT COLUMN -->
     <section class="panel">
       <div class="tabs">
         <button class="tab-btn active" data-tab="units">Units & Training</button>
@@ -114,9 +142,9 @@
 
       <div id="tab-missions" style="display:none">
         <h3>Send Mission</h3>
-        <div class="sub">Choose difficulty and send troops. They’ll fight <b>waves</b> of monsters and bring back rewards if they survive.</div>
+        <div class="sub">Choose difficulty and send troops. They’ll fight waves of monsters and bring back rewards if they survive.</div>
         <div class="card">
-          <div class="grid3">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
             <label>Difficulty
               <select id="mission-diff">
                 <option value="1">Easy</option>
@@ -124,27 +152,29 @@
                 <option value="3">Hard</option>
               </select>
             </label>
-            <label>Town Plaza bonus <span class="muted">(Lvl)</span>
-              <div><span class="tag">Reward +<span id="tp-bonus">0</span>%</span> <span class="tag">Duration −<span id="tp-speed">0</span>%</span></div>
+            <label>Town Plaza bonus
+              <div><span class="badge">Reward +<span id="tp-bonus">0</span>%</span>
+              <span class="badge">Duration −<span id="tp-speed">0</span>%</span></div>
             </label>
             <label>Wall mitigation
-              <div><span class="tag">Damage −<span id="wall-mit">0</span>%</span></div>
+              <div><span class="badge">Damage −<span id="wall-mit">0</span>%</span></div>
             </label>
           </div>
-          <div class="grid3" style="margin-top:10px">
-            <label>Infantry to send <input type="number" min="0" value="0" id="send-infantry"></label>
-            <label>Archers to send <input type="number" min="0" value="0" id="send-archer"></label>
-            <label>Cavalry to send <input type="number" min="0" value="0" id="send-cavalry"></label>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
+            <label>Infantry <input type="number" min="0" value="0" id="send-infantry"></label>
+            <label>Archers <input type="number" min="0" value="0" id="send-archer"></label>
+            <label>Cavalry <input type="number" min="0" value="0" id="send-cavalry"></label>
           </div>
           <div class="actions" style="margin-top:10px">
             <button id="btn-send-mission" class="primary">Send Mission</button>
-            <span class="help">Only one mission at a time. Troops are unavailable until they return.</span>
           </div>
         </div>
 
         <div id="mission-active" class="card" style="display:none;margin-top:10px">
           <div class="row"><div class="name">Active Mission</div><span id="mission-dets" class="badge"></span></div>
-          <div class="progress" style="margin-top:6px"><div id="mq-bar" class="bar" style="width:0%"></div></div>
+          <div style="height:10px;background:#eadfc3;border-radius:999px;overflow:hidden;border:1px solid var(--border)">
+            <div id="mq-bar" style="height:100%;background:linear-gradient(90deg,#2f7a3e,#6ea85d);width:0%"></div>
+          </div>
           <div class="sub" id="mq-eta">—</div>
           <table class="table" style="margin-top:8px">
             <thead><tr><th>Wave</th><th>Enemy Power</th><th>Result</th></tr></thead>
@@ -157,9 +187,9 @@
 
       <div id="tab-market" style="display:none">
         <h3>Market</h3>
-        <div class="sub">Trade resources at a small fee. Higher <b>Market</b> level reduces fee.</div>
+        <div class="sub">Trade resources at a fee. Higher Market level reduces fee.</div>
         <div class="card">
-          <div class="grid3">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
             <label>Give
               <select id="trade-from">
                 <option value="wood">Wood</option><option value="clay">Clay</option><option value="iron">Iron</option><option value="food">Food</option>
@@ -176,7 +206,7 @@
           </div>
           <div class="actions" style="margin-top:10px">
             <button id="btn-trade" class="primary">Execute Trade</button>
-            <span class="help">Fee: <b id="trade-fee">20%</b></span>
+            <span class="sub">Fee: <b id="trade-fee">20%</b></span>
           </div>
         </div>
       </div>
@@ -191,39 +221,50 @@
 
       <div id="tab-help" style="display:none">
         <h3>How to play</h3>
-        <ul class="help">
-          <li>Upgrade <b>Lumbermill / Clay Mine / Iron Mine / Farm</b> to generate resources over time.</li>
-          <li>Upgrade <b>Houses</b> to raise <b>Population Cap</b>. Units consume population.</li>
-          <li><b>Barracks / Archer Camp / Stable</b> unlock and speed training of Infantry, Archers, Cavalry.</li>
-          <li><b>Town Center</b> reduces construction time. <b>Wall</b> reduces mission casualties. <b>Market</b> reduces trade fee.</li>
-          <li>Use the <b>Town Plaza</b> to send troops on missions (waves of monsters). Rewards scale with difficulty and Town Plaza level.</li>
-          <li>Game autosaves. Use <b>Wipe Save</b> to start over.</li>
+        <ul class="sub">
+          <li>Upgrade production buildings (Lumbermill/Clay/Iron/Farm).</li>
+          <li>Houses increase population cap. Barracks/Archer Camp/Stable enable training.</li>
+          <li>Town Center speeds construction. Wall reduces mission casualties. Market lowers trade fee.</li>
+          <li>Use Town Plaza to send missions; rewards scale with difficulty and Plaza level.</li>
         </ul>
-        <div class="footer">Prototype made as a single HTML file. Balance numbers are intentionally gentle for quick testing.</div>
+        <div class="footer">3D view built with Three.js; camera is fixed to an isometric-like angle.</div>
       </div>
+    </section>
 
+    <section class="panel">
+      <h2>Buildings</h2>
+      <div class="sub">Click items in the 3D village to focus here.</div>
+      <div id="buildings" class="list"></div>
+      <div id="build-queue" class="card" style="margin-top:10px;display:none">
+        <div class="row"><div class="name">Construction Queue</div><span class="badge" id="bq-name"></span></div>
+        <div style="height:10px;background:#eadfc3;border-radius:999px;overflow:hidden;border:1px solid var(--border)">
+          <div id="bq-bar" style="height:100%;background:linear-gradient(90deg,#2f7a3e,#6ea85d);width:0%"></div>
+        </div>
+        <div class="sub" id="bq-eta">—</div>
+      </div>
     </section>
   </div>
 </main>
 
+<!-- Three.js -->
+<script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
 <script>
 /* --------------------------
    Core Data & Utilities
 ---------------------------*/
 const fmt = n => Math.floor(n).toLocaleString();
-const sgn = n => (n>=0?'+':'')+n.toFixed(2);
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 function formatTime(ms){
   let s=Math.max(0,Math.ceil(ms/1000));
   const h=Math.floor(s/3600); s%=3600;
   const m=Math.floor(s/60); s%=60;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return \`\${String(h).padStart(2,'0')}:\${String(m).padStart(2,'0')}:\${String(s).padStart(2,'0')}\`;
 }
 function percent(n){return Math.round(n*100)}
 function deepClone(o){return JSON.parse(JSON.stringify(o))}
 
 /* --------------------------
-   Game Definitions
+   Game Definitions (same core as before)
 ---------------------------*/
 const BUILDINGS = {
   townCenter:{name:'Town Center',desc:'Speeds up construction.', baseCost:{wood:200,clay:200,iron:150,food:0}, costMult:1.55, baseTime:15000, effectLvl:(lvl)=>({buildSpeed: 1+0.08*lvl})},
@@ -239,58 +280,45 @@ const BUILDINGS = {
   stable    :{name:'Stable', desc:'Train cavalry; speeds cavalry training.', baseCost:{wood:150,clay:120,iron:150,food:50}, costMult:1.5, baseTime:13000, effectLvl:(lvl)=>({trainSpeedCav: 1+0.07*lvl})},
   wall      :{name:'Wall', desc:'Reduces casualties on missions.', baseCost:{wood:120,clay:160,iron:200,food:0}, costMult:1.55, baseTime:14000, effectLvl:(lvl)=>({mitigation: Math.min(0.02*lvl,0.5)})}
 };
-// Unit base stats & training
 const UNITS = {
   infantry:{name:'Infantry', atk:5, hp:10, pop:1, time:9000, cost:{wood:50,clay:30,iron:20,food:10}, building:'barracks'},
   archer  :{name:'Archer',   atk:7, hp:8,  pop:1, time:11000,cost:{wood:80,clay:20,iron:40,food:10}, building:'archerCamp'},
   cavalry :{name:'Cavalry',  atk:15,hp:20, pop:3, time:16000,cost:{wood:100,clay:80,iron:120,food:30},building:'stable'}
 };
-// Resource per-second base from prod buildings (scaled by level^1.2)
 const BASE_PROD = {wood:1.2, clay:1.1, iron:1.0, food:0.9};
-
-// Starting state
 const DEFAULT_STATE = {
   t0: Date.now(),
   timePlayedMs:0,
   resources:{wood:200,clay:200,iron:200,food:100},
-  buildings:Object.fromEntries(Object.keys(BUILDINGS).map(k=>[k,1])), // start at lvl 1
-  construction:null, // {id,start,finish}
+  buildings:Object.fromEntries(Object.keys(BUILDINGS).map(k=>[k,1])),
+  construction:null,
   units:{infantry:0, archer:0, cavalry:0},
-  training:[], // {type,countLeft,perUnit,start,finish,building}
-  mission:null, // active mission
-  missionLog:[], // last few results
-  reservedPop:0, // out on mission
+  training:[],
+  mission:null,
+  missionLog:[],
+  reservedPop:0,
 };
-// Load / Save
 let state = loadState();
 function loadState(){
   try{
-    const raw=localStorage.getItem('vw-save');
-    if(raw){
-      const s=JSON.parse(raw);
-      return {...DEFAULT_STATE, ...s};
-    }
-  }catch(e){console.warn('Load fail',e)}
+    const raw=localStorage.getItem('vw-save-3d');
+    if(raw){ const s=JSON.parse(raw); return {...DEFAULT_STATE, ...s}; }
+  }catch(e){}
   return deepClone(DEFAULT_STATE);
 }
-function saveState(){localStorage.setItem('vw-save', JSON.stringify(state))}
+function saveState(){ localStorage.setItem('vw-save-3d', JSON.stringify(state)) }
 
 /* --------------------------
    Calculations
 ---------------------------*/
 function buildingLevel(id){return state.buildings[id]||0}
 function buildingEffects(){
-  // Aggregate simple effects
   const eff={buildSpeed:1,rewardBonus:0,missionSpeed:0,mitigation:0,fee:0.2,trainSpeedInf:1,trainSpeedArc:1,trainSpeedCav:1,popCap:0};
   for(const [id, def] of Object.entries(BUILDINGS)){
-    const lvl=buildingLevel(id);
-    if(!def.effectLvl) continue;
-    const e=def.effectLvl(lvl);
-    for(const k in e){eff[k]=(eff[k]||0)+e[k]}
+    const lvl=buildingLevel(id); if(!def.effectLvl) continue;
+    const e=def.effectLvl(lvl); for(const k in e){eff[k]=(eff[k]||0)+e[k]}
   }
-  // fee takes special handling (min)
   eff.fee = BUILDINGS.market.effectLvl(buildingLevel('market')).fee;
-  // popCap from houses only
   eff.popCap = BUILDINGS.houses.effectLvl(buildingLevel('houses')).popCap || 0;
   return eff;
 }
@@ -306,19 +334,11 @@ function prodPerSec(){
   }
   return res;
 }
-function canAfford(cost){
-  return Object.entries(cost).every(([k,v])=> (state.resources[k]||0) >= v);
-}
-function spend(cost){
-  for(const [k,v] of Object.entries(cost)){state.resources[k]-=v}
-}
+function canAfford(cost){ return Object.entries(cost).every(([k,v])=> (state.resources[k]||0) >= v) }
+function spend(cost){ for(const [k,v] of Object.entries(cost)){state.resources[k]-=v} }
 function getBuildCost(id){
   const def=BUILDINGS[id], lvl=buildingLevel(id);
-  const c={};
-  for(const r of ['wood','clay','iron','food']){
-    const base=def.baseCost[r]||0;
-    c[r]=Math.floor(base*Math.pow(def.costMult,lvl-1));
-  }
+  const c={}; for(const r of ['wood','clay','iron','food']){ const base=def.baseCost[r]||0; c[r]=Math.floor(base*Math.pow(def.costMult,lvl-1)); }
   return c;
 }
 function getBuildTimeMs(id){
@@ -327,16 +347,12 @@ function getBuildTimeMs(id){
   const speed=buildingEffects().buildSpeed;
   return Math.floor(base/Math.max(1,speed));
 }
-function idlePopulation(){
-  const usedInArmy = Object.entries(state.units).reduce((a,[t,n])=>a+n*UNITS[t].pop,0);
-  return usedInArmy - state.reservedPop;
-}
+function idlePopulation(){ const used = Object.entries(state.units).reduce((a,[t,n])=>a+n*UNITS[t].pop,0); return used - state.reservedPop; }
 function totalPopulationCap(){ return buildingEffects().popCap }
 function freePopulation(){ return Math.max(0, totalPopulationCap() - idlePopulation()) }
 function unitCost(type){ return deepClone(UNITS[type].cost) }
 function unitTimeMs(type){
-  const u=UNITS[type];
-  const eff=buildingEffects();
+  const u=UNITS[type], eff=buildingEffects();
   const mult = type==='infantry'? eff.trainSpeedInf : type==='archer'?eff.trainSpeedArc:eff.trainSpeedCav;
   return Math.floor(u.time/Math.max(1,mult));
 }
@@ -356,10 +372,11 @@ function queueUpgrade(id){
 }
 function tickConstruction(now){
   if(!state.construction) return;
-  const {id,start,finish}=state.construction;
+  const {id,finish}=state.construction;
   if(now>=finish){
     state.buildings[id]=(state.buildings[id]||1)+1;
     state.construction=null;
+    updateBuildingMesh(id);
   }
 }
 
@@ -369,10 +386,8 @@ function tickConstruction(now){
 function queueTraining(type,count){
   count = Math.max(0, Math.floor(count));
   if(!count) return;
-  // population check
   let popNeeded = UNITS[type].pop*count;
   if(popNeeded > freePopulation()) return alert('Not enough population capacity (build Houses).');
-  // resource check per unit
   const c=unitCost(type);
   const totalCost={wood:c.wood*count,clay:c.clay*count,iron:c.iron*count,food:c.food*count};
   if(!canAfford(totalCost)) return alert('Not enough resources.');
@@ -387,13 +402,9 @@ function tickTraining(now){
     if(now>=q.finish && q.countLeft>0){
       state.units[q.type]+=1;
       q.countLeft-=1;
-      if(q.countLeft>0){
-        q.start = now;
-        q.finish = now + q.perUnit;
-      }
+      if(q.countLeft>0){ q.start = now; q.finish = now + q.perUnit; }
     }
   }
-  // clean finished
   state.training = state.training.filter(q=>q.countLeft>0);
 }
 
@@ -409,69 +420,43 @@ function calcMissionDurationMs(diff){
   return base;
 }
 function genWaves(diff){
-  // 3 waves, power scales by diff and index (+/-10%)
-  const waves=[];
-  let base = 75*diff;
-  for(let i=1;i<=3;i++){
-    const mult = Math.pow(1.55, i-1);
-    const jitter = 0.9 + Math.random()*0.2;
-    const power = Math.floor(base*mult*jitter);
-    waves.push({power, result:null});
-  }
+  const waves=[]; let base = 75*diff;
+  for(let i=1;i<=3;i++){ const mult = Math.pow(1.55, i-1); const jitter = 0.9 + Math.random()*0.2; const power = Math.floor(base*mult*jitter); waves.push({power, result:null}); }
   return waves;
 }
 function sendMission(diff, send){
   if(state.mission) return alert('A mission is already active.');
-  // check unit availability
-  for(const t of Object.keys(UNITS)){
-    if(send[t]>(state.units[t]||0)) return alert(`Not enough ${UNITS[t].name}.`);
-  }
-  // reserve population (those units leave town)
+  for(const t of Object.keys(UNITS)){ if(send[t]>(state.units[t]||0)) return alert(\`Not enough \${UNITS[t].name}.\`); }
   const popRes = Object.keys(send).reduce((a,t)=>a+send[t]*UNITS[t].pop,0);
   state.reservedPop += popRes;
-
-  // remove sent units from garrison temporarily
   for(const t in send){ state.units[t]-=send[t] }
-
   const now=Date.now();
   const dur=calcMissionDurationMs(diff);
-  state.mission = {
-    diff, send, start:now, finish:now+dur, waves:genWaves(diff), resolved:false, log:null
-  };
+  state.mission = { diff, send, start:now, finish:now+dur, waves:genWaves(diff), resolved:false, log:null };
 }
 function simulateMission(){
   const m=state.mission; if(!m) return;
-  // Copy units so we can compute casualties
   const curUnits=deepClone(m.send);
   const totalInitialHP = Object.entries(curUnits).reduce((hp,[t,n])=>hp + n*UNITS[t].hp,0);
-  let totalHP = totalInitialHP * (1 + wallMitigation()); // wall acts like effective HP boost
+  let totalHP = totalInitialHP * (1 + wallMitigation());
   const totalATK = Object.entries(curUnits).reduce((a,[t,n])=>a + n*UNITS[t].atk,0);
-
-  const waves=m.waves;
   let success=true;
-  for(let i=0;i<waves.length;i++){
-    const w=waves[i];
-    // if underpowered, take more damage
+  for(let i=0;i<m.waves.length;i++){
+    const w=m.waves[i];
     const under = Math.max(1, w.power / Math.max(1,totalATK));
     let dmg = w.power * under * (1 - wallMitigation());
     totalHP -= dmg;
-    const survived = totalHP>0;
-    w.result = survived ? 'survived' : 'defeated';
+    const survived = totalHP>0; w.result = survived ? 'survived' : 'defeated';
     if(!survived){ success=false; break; }
   }
-  // casualties proportional to HP lost
   const hpLost = Math.max(0, totalInitialHP - Math.max(0,totalHP));
-  let lossRatio = clamp(hpLost / Math.max(1,totalInitialHP), 0, 0.95); // cap losses to avoid always wiping
+  let lossRatio = clamp(hpLost / Math.max(1,totalInitialHP), 0, 0.95);
   const casualties={infantry:0,archer:0,cavalry:0};
   for(const t of Object.keys(curUnits)){
-    const n=curUnits[t];
-    const lost = Math.min(n, Math.floor(n*lossRatio*(1 - wallMitigation()*0.5)));
-    casualties[t]=lost;
-    curUnits[t]-=lost;
+    const n=curUnits[t]; const lost = Math.min(n, Math.floor(n*lossRatio*(1 - wallMitigation()*0.5)));
+    casualties[t]=lost; curUnits[t]-=lost;
   }
   const survivors=curUnits;
-
-  // Rewards
   let rewardMult = 1 + townPlazaBonus();
   const baseReward = (m.diff===1?180:(m.diff===2?320:520));
   const reward = {
@@ -485,32 +470,19 @@ function simulateMission(){
 function finalizeMission(){
   const m=state.mission; if(!m) return;
   const result = simulateMission();
-  // Return survivors to army, free reserved population
   const sentPop = Object.entries(m.send).reduce((a,[t,n])=>a+n*UNITS[t].pop,0);
-  const survivorsPop = Object.entries(result.survivors).reduce((a,[t,n])=>a+n*UNITS[t].pop,0);
-  state.reservedPop -= sentPop; // release reservation
+  state.reservedPop -= sentPop;
   for(const t in result.survivors){ state.units[t]+=result.survivors[t] }
-
-  // Apply reward if success
-  if(result.success){
-    for(const k in result.reward){ state.resources[k]+=result.reward[k] }
-  }
-
-  // Log
+  if(result.success){ for(const k in result.reward){ state.resources[k]+=result.reward[k] } }
   const logEntry = {
-    time: new Date().toLocaleString(),
-    diff: m.diff,
-    success: result.success,
-    sent: m.send,
-    casualties: result.casualties,
+    time: new Date().toLocaleString(), diff: m.diff, success: result.success,
+    sent: m.send, casualties: result.casualties,
     reward: result.success?result.reward:null,
     waves: m.waves.map(w=>({power:w.power,result:w.result}))
   };
-  state.missionLog.unshift(logEntry);
-  state.missionLog = state.missionLog.slice(0,6);
-  state.mission=null;
-  renderMissionLog();
-  alert(result.success?`Mission success! Loot: +${fmt(logEntry.reward.wood)} wood, +${fmt(logEntry.reward.clay)} clay, +${fmt(logEntry.reward.iron)} iron, +${fmt(logEntry.reward.food)} food.`:`Mission failed. Your troops were overwhelmed.`);
+  state.missionLog.unshift(logEntry); state.missionLog = state.missionLog.slice(0,6);
+  state.mission=null; renderMissionLog();
+  alert(result.success?\`Mission success! Loot: +\${fmt(logEntry.reward.wood)} wood, +\${fmt(logEntry.reward.clay)} clay, +\${fmt(logEntry.reward.iron)} iron, +\${fmt(logEntry.reward.food)} food.\`:\`Mission failed.\`);
 }
 
 /* --------------------------
@@ -518,39 +490,18 @@ function finalizeMission(){
 ---------------------------*/
 let lastTick=Date.now();
 function gameTick(){
-  const now=Date.now();
-  const dt=(now-lastTick)/1000; // seconds
-  lastTick=now;
-
-  // resources
+  const now=Date.now(); const dt=(now-lastTick)/1000; lastTick=now;
   const prod=prodPerSec();
-  for(const k of ['wood','clay','iron','food']){
-    state.resources[k] += (prod[k]||0)*dt;
-  }
-
-  // construction & training
-  tickConstruction(now);
-  tickTraining(now);
-
-  // mission
-  if(state.mission && now>=state.mission.finish){
-    finalizeMission();
-  }
-
-  // time played
+  for(const k of ['wood','clay','iron','food']){ state.resources[k] += (prod[k]||0)*dt; }
+  tickConstruction(now); tickTraining(now);
+  if(state.mission && now>=state.mission.finish){ finalizeMission(); }
   state.timePlayedMs += dt*1000;
-
-  // autosave periodically
   autosave(dt);
-
   render();
   requestAnimationFrame(gameTick);
 }
 let autosaveTimer=0;
-function autosave(dt){
-  autosaveTimer+=dt;
-  if(autosaveTimer>=10){ saveState(); autosaveTimer=0; }
-}
+function autosave(dt){ autosaveTimer+=dt; if(autosaveTimer>=10){ saveState(); autosaveTimer=0; }}
 
 /* --------------------------
    Rendering
@@ -561,203 +512,133 @@ function renderResources(){
   document.getElementById('r-clay').textContent=fmt(state.resources.clay);
   document.getElementById('r-iron').textContent=fmt(state.resources.iron);
   document.getElementById('r-food').textContent=fmt(state.resources.food);
-  document.getElementById('p-wood').textContent=`+${prod.wood.toFixed(2)}/s`;
-  document.getElementById('p-clay').textContent=`+${prod.clay.toFixed(2)}/s`;
-  document.getElementById('p-iron').textContent=`+${prod.iron.toFixed(2)}/s`;
-  document.getElementById('p-food').textContent=`+${prod.food.toFixed(2)}/s`;
+  document.getElementById('p-wood').textContent=\`+\${prod.wood.toFixed(2)}/s\`;
+  document.getElementById('p-clay').textContent=\`+\${prod.clay.toFixed(2)}/s\`;
+  document.getElementById('p-iron').textContent=\`+\${prod.iron.toFixed(2)}/s\`;
+  document.getElementById('p-food').textContent=\`+\${prod.food.toFixed(2)}/s\`;
   document.getElementById('clock').textContent = formatTime(state.timePlayedMs);
-  document.getElementById('pop').textContent = `${idlePopulation()}/${totalPopulationCap()}`;
+  document.getElementById('pop').textContent = \`\${idlePopulation()}/\${totalPopulationCap()}\`;
 }
-
 function renderBuildings(){
-  const container=document.getElementById('buildings');
-  container.innerHTML='';
+  const container=document.getElementById('buildings'); container.innerHTML='';
   for(const [id,def] of Object.entries(BUILDINGS)){
     const lvl=buildingLevel(id);
     const cost=getBuildCost(id);
     const timeMs=getBuildTimeMs(id);
     const card=document.createElement('div');
-    card.className='card';
-    card.innerHTML=`
+    card.className='card'; card.dataset.card=id;
+    card.innerHTML=\`
       <div class="row">
-        <div class="split">
-          <div class="name">${def.name}</div>
-          <span class="badge">Lvl ${lvl}</span>
-        </div>
-        <div class="actions">
-          <button ${state.construction?'disabled':''} data-up="${id}" class="primary">Upgrade</button>
-        </div>
+        <div><div class="name">\${def.name}</div><span class="badge">Lvl \${lvl}</span></div>
+        <div class="actions"><button \${state.construction?'disabled':''} data-up="\${id}" class="primary">Upgrade</button></div>
       </div>
-      <div class="sub">${def.desc||''}</div>
+      <div class="sub">\${def.desc||''}</div>
       <div class="costs">
         <span>Cost:</span>
-        <span>🪵 ${fmt(cost.wood||0)}</span>
-        <span>🧱 ${fmt(cost.clay||0)}</span>
-        <span>⛓️ ${fmt(cost.iron||0)}</span>
-        <span>🥖 ${fmt(cost.food||0)}</span>
-        <span>⏳ ${formatTime(timeMs)}</span>
-      </div>
-    `;
+        <span>🪵 \${fmt(cost.wood||0)}</span>
+        <span>🧱 \${fmt(cost.clay||0)}</span>
+        <span>⛓️ \${fmt(cost.iron||0)}</span>
+        <span>🥖 \${fmt(cost.food||0)}</span>
+        <span>⏳ \${formatTime(timeMs)}</span>
+      </div>\`;
     container.appendChild(card);
   }
-  // queue box
   const qWrap=document.getElementById('build-queue');
   if(state.construction){
-    const now=Date.now();
-    const {id,start,finish,ms}=state.construction;
+    const now=Date.now(); const {id,start,finish,ms}=state.construction;
     const pct = clamp((now-start)/ms,0,1)*100;
-    qWrap.style.display='';
-    document.getElementById('bq-name').textContent=`${BUILDINGS[id].name}`;
-    document.getElementById('bq-bar').style.width=`${pct}%`;
-    document.getElementById('bq-eta').textContent=`Finishes in ${formatTime(finish-now)}`;
-  }else{
-    qWrap.style.display='none';
-  }
-  // wire buttons
+    qWrap.style.display=''; document.getElementById('bq-name').textContent=BUILDINGS[id].name;
+    document.getElementById('bq-bar').style.width=\`\${pct}%\`;
+    document.getElementById('bq-eta').textContent=\`Finishes in \${formatTime(finish-now)}\`;
+  }else{ qWrap.style.display='none'; }
   container.querySelectorAll('button[data-up]').forEach(btn=>{
     btn.onclick=()=>queueUpgrade(btn.getAttribute('data-up'));
   })
 }
-
 function renderTraining(){
-  const holder=document.getElementById('training-cards');
-  holder.innerHTML='';
+  const holder=document.getElementById('training-cards'); holder.innerHTML='';
   for(const [type,u] of Object.entries(UNITS)){
     const buildId=u.building;
     const buildLvl = buildingLevel(buildId);
-    const unlocked = buildLvl>=1; // always true since start lvl 1, but keep logic
-    const c=unitCost(type);
-    const perMs=unitTimeMs(type);
+    const c=unitCost(type); const perMs=unitTimeMs(type);
     const card=document.createElement('div');
     card.className='card';
-    card.innerHTML=`
+    card.innerHTML=\`
       <div class="row">
-        <div class="split">
-          <div class="name">${u.name}</div>
-          <span class="badge">${unlocked?`Unlocked (Lvl ${buildLvl} ${BUILDINGS[buildId].name})`:`Locked — build ${BUILDINGS[buildId].name}`}</span>
+        <div><div class="name">\${u.name}</div>
+          <span class="badge">Lvl \${buildLvl} \${BUILDINGS[buildId].name}</span>
         </div>
         <div class="actions">
-          <input type="number" min="1" value="1" id="qty-${type}">
-          <button ${!unlocked?'disabled':''} data-train="${type}" class="primary">Train</button>
+          <input type="number" min="1" value="1" id="qty-\${type}">
+          <button data-train="\${type}" class="primary">Train</button>
         </div>
       </div>
       <div class="costs">
-        <span>Cost per unit:</span>
-        <span>🪵 ${fmt(c.wood)}</span>
-        <span>🧱 ${fmt(c.clay)}</span>
-        <span>⛓️ ${fmt(c.iron)}</span>
-        <span>🥖 ${fmt(c.food)}</span>
-        <span>⏳ ${formatTime(perMs)}</span>
-        <span>👥 ${u.pop}</span>
-      </div>
-    `;
+        <span>Cost/unit:</span>
+        <span>🪵 \${fmt(c.wood)}</span><span>🧱 \${fmt(c.clay)}</span><span>⛓️ \${fmt(c.iron)}</span><span>🥖 \${fmt(c.food)}</span>
+        <span>⏳ \${formatTime(perMs)}</span><span>👥 \${u.pop}</span>
+      </div>\`;
     holder.appendChild(card);
   }
   holder.querySelectorAll('button[data-train]').forEach(btn=>{
     btn.onclick=()=>{
       const t=btn.getAttribute('data-train');
-      const qty=parseInt(document.getElementById(`qty-${t}`).value||'0',10);
+      const qty=parseInt(document.getElementById(\`qty-\${t}\`).value||'0',10);
       queueTraining(t,qty);
     };
   });
-
-  // queues
-  const qWrap=document.getElementById('train-queues');
-  qWrap.innerHTML='';
+  const qWrap=document.getElementById('train-queues'); qWrap.innerHTML='';
   for(const q of state.training){
     const pct = clamp((Date.now()-q.start)/q.perUnit,0,1)*100;
-    const item=document.createElement('div');
-    item.className='card';
-    item.innerHTML=`
-      <div class="row"><div class="name">Training ${UNITS[q.type].name}</div><span class="badge">${q.countLeft} left</span></div>
-      <div class="progress" style="margin-top:6px"><div class="bar" style="width:${pct}%"></div></div>
-      <div class="sub">Next in ${formatTime(q.finish-Date.now())}</div>
-    `;
+    const item=document.createElement('div'); item.className='card';
+    item.innerHTML=\`
+      <div class="row"><div class="name">Training \${UNITS[q.type].name}</div><span class="badge">\${q.countLeft} left</span></div>
+      <div style="height:10px;background:#eadfc3;border-radius:999px;overflow:hidden;border:1px solid var(--border)"><div style="height:100%;background:linear-gradient(90deg,#2f7a3e,#6ea85d);width:\${pct}%"></div></div>
+      <div class="sub">Next in \${formatTime(q.finish-Date.now())}</div>\`;
     qWrap.appendChild(item);
   }
 }
-
 function renderArmy(){
-  const body=document.getElementById('army-rows');
-  body.innerHTML='';
+  const body=document.getElementById('army-rows'); body.innerHTML='';
   for(const [t,u] of Object.entries(UNITS)){
     const count=state.units[t];
     const row=document.createElement('tr');
-    row.innerHTML=`
-      <td>${u.name}</td>
-      <td>${fmt(count)} <span class="muted">(idle)</span></td>
-      <td>${u.atk}</td><td>${u.hp}</td><td>${u.pop}</td>
-    `;
+    row.innerHTML=\`<td>\${u.name}</td><td>\${fmt(count)} <span class="sub">(idle)</span></td><td>\${u.atk}</td><td>\${u.hp}</td><td>\${u.pop}</td>\`;
     body.appendChild(row);
   }
 }
-
 function renderMissions(){
   document.getElementById('tp-bonus').textContent=percent(townPlazaBonus());
   document.getElementById('tp-speed').textContent=percent(townPlazaSpeed());
   document.getElementById('wall-mit').textContent=percent(wallMitigation());
-
-  // active
-  const m=state.mission;
-  const box=document.getElementById('mission-active');
+  const m=state.mission, box=document.getElementById('mission-active');
   if(m){
-    box.style.display='';
-    const now=Date.now();
-    const pct=clamp((now-m.start)/(m.finish-m.start),0,1)*100;
-    document.getElementById('mq-bar').style.width=`${pct}%`;
-    document.getElementById('mq-eta').textContent=`Returns in ${formatTime(m.finish-now)}`;
-    document.getElementById('mission-dets').textContent=`Diff ${m.diff} • ${Object.entries(m.send).map(([t,n])=>`${UNITS[t].name}×${n}`).join(', ')||'No troops??'}`;
-    // show waves power & TBD
+    box.style.display=''; const now=Date.now(); const pct=clamp((now-m.start)/(m.finish-m.start),0,1)*100;
+    document.getElementById('mq-bar').style.width=\`\${pct}%\`;
+    document.getElementById('mq-eta').textContent=\`Returns in \${formatTime(m.finish-now)}\`;
+    document.getElementById('mission-dets').textContent=\`Diff \${m.diff}\`;
     const tbody=document.getElementById('mq-waves'); tbody.innerHTML='';
-    for(let i=0;i<m.waves.length;i++){
-      const w=m.waves[i];
-      const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${i+1}</td><td>${fmt(w.power)}</td><td class="muted">${w.result||'TBD'}</td>`;
-      tbody.appendChild(tr);
-    }
-  }else{
-    box.style.display='none';
-  }
+    for(let i=0;i<m.waves.length;i++){ const w=m.waves[i]; const tr=document.createElement('tr'); tr.innerHTML=\`<td>\${i+1}</td><td>\${fmt(w.power)}</td><td>\${w.result||'TBD'}</td>\`; tbody.appendChild(tr); }
+  }else{ box.style.display='none'; }
 }
 function renderMissionLog(){
-  const list=document.getElementById('mission-log');
-  list.innerHTML='';
+  const list=document.getElementById('mission-log'); list.innerHTML='';
   for(const entry of state.missionLog){
-    const div=document.createElement('div');
-    div.className='card';
-    div.innerHTML=`
-      <div class="row">
-        <div class="split">
-          <div class="name">${entry.success? '✅ Success' : '❌ Failed'}</div>
-          <span class="badge">Diff ${entry.diff}</span>
-          <span class="badge">${entry.time}</span>
-        </div>
-      </div>
-      <div class="sub">
-        Sent: ${Object.entries(entry.sent).map(([t,n])=>`${UNITS[t].name}×${n}`).join(', ')}
-      </div>
-      <div class="sub">
-        Casualties: ${Object.entries(entry.casualties).map(([t,n])=>`${UNITS[t].name}×${n}`).join(', ')}
-      </div>
-      ${entry.success? `<div class="costs"><span>Loot:</span><span>🪵 ${fmt(entry.reward.wood)}</span><span>🧱 ${fmt(entry.reward.clay)}</span><span>⛓️ ${fmt(entry.reward.iron)}</span><span>🥖 ${fmt(entry.reward.food)}</span></div>`:''}
-      <div class="sub muted">Waves: ${entry.waves.map((w,i)=>`#${i+1}:${fmt(w.power)}(${w.result[0].toUpperCase()})`).join(' • ')}</div>
-    `;
+    const div=document.createElement('div'); div.className='card';
+    div.innerHTML=\`
+      <div class="row"><div class="name">\${entry.success? '✅ Success' : '❌ Failed'}</div><span class="badge">Diff \${entry.diff}</span><span class="badge">\${entry.time}</span></div>
+      <div class="sub">Sent: \${Object.entries(entry.sent).map(([t,n])=>\`\${UNITS[t].name}×\${n}\`).join(', ')}</div>
+      <div class="sub">Casualties: \${Object.entries(entry.casualties).map(([t,n])=>\`\${UNITS[t].name}×\${n}\`).join(', ')}</div>
+      \${entry.success? \`<div class="costs"><span>Loot:</span><span>🪵 \${fmt(entry.reward.wood)}</span><span>🧱 \${fmt(entry.reward.clay)}</span><span>⛓️ \${fmt(entry.reward.iron)}</span><span>🥖 \${fmt(entry.reward.food)}</span></div>\`:''}\`;
     list.appendChild(div);
   }
 }
-
 function renderMarket(){
   const fee = buildingEffects().fee;
   document.getElementById('trade-fee').textContent = percent(fee)+'%';
 }
-
 function render(){
-  renderResources();
-  renderBuildings();
-  renderTraining();
-  renderArmy();
-  renderMissions();
-  renderMarket();
+  renderResources(); renderBuildings(); renderTraining(); renderArmy(); renderMissions(); renderMarket(); update3DLabels();
 }
 
 /* --------------------------
@@ -773,15 +654,10 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     });
   };
 });
-
 document.getElementById('btn-save').onclick=()=>{ saveState(); alert('Game saved!') };
 document.getElementById('btn-reset').onclick=()=>{
-  if(confirm('Wipe your save and restart?')){
-    localStorage.removeItem('vw-save');
-    state = deepClone(DEFAULT_STATE);
-  }
+  if(confirm('Wipe your save and restart?')){ localStorage.removeItem('vw-save-3d'); state = deepClone(DEFAULT_STATE); init3DStateSync(); }
 };
-
 document.getElementById('btn-trade').onclick=()=>{
   const from=document.getElementById('trade-from').value;
   const to=document.getElementById('trade-to').value;
@@ -789,36 +665,225 @@ document.getElementById('btn-trade').onclick=()=>{
   const amt=parseInt(document.getElementById('trade-amt').value||'0',10);
   if(amt<=0) return;
   if(state.resources[from]<amt) return alert('Not enough to trade.');
-  const fee=buildingEffects().fee;
-  const receive=Math.floor(amt*(1-fee));
-  state.resources[from]-=amt; state.resources[to]+=receive;
-  renderResources(); renderMarket();
+  const fee=buildingEffects().fee; const receive=Math.floor(amt*(1-fee));
+  state.resources[from]-=amt; state.resources[to]+=receive; renderResources(); renderMarket();
 };
-
 document.getElementById('btn-send-mission').onclick=()=>{
   const diff=parseInt(document.getElementById('mission-diff').value,10);
-  const send={
-    infantry: parseInt(document.getElementById('send-infantry').value||'0',10),
-    archer:   parseInt(document.getElementById('send-archer').value||'0',10),
-    cavalry:  parseInt(document.getElementById('send-cavalry').value||'0',10),
-  };
-  const tot = send.infantry+send.archer+send.cavalry;
-  if(tot<=0) return alert('Send at least one unit.');
+  const send={ infantry:parseInt(document.getElementById('send-infantry').value||'0',10),
+               archer:parseInt(document.getElementById('send-archer').value||'0',10),
+               cavalry:parseInt(document.getElementById('send-cavalry').value||'0',10)};
+  const tot = send.infantry+send.archer+send.cavalry; if(tot<=0) return alert('Send at least one unit.');
   sendMission(diff, send);
-  // reset inputs
-  document.getElementById('send-infantry').value=0;
-  document.getElementById('send-archer').value=0;
-  document.getElementById('send-cavalry').value=0;
+  document.getElementById('send-infantry').value=0; document.getElementById('send-archer').value=0; document.getElementById('send-cavalry').value=0;
   renderMissions();
 };
 
 /* --------------------------
-   Start
+   3D VIEW (Three.js)
 ---------------------------*/
+let renderer, scene, camera, raycaster, mouse;
+const meshes = {}; // id -> THREE.Object3D
+const labelTip = document.getElementById('hover-tip');
+function init3D(){
+  const el = document.getElementById('scene3d');
+  scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x9fcf7a, 60, 140);
+  const w = el.clientWidth, h = el.clientHeight;
+  camera = new THREE.PerspectiveCamera(55, w/h, 0.1, 500);
+  camera.position.set(36, 32, 36); // locked isometric-ish
+  camera.lookAt(0,0,0);
+
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(w,h); renderer.setPixelRatio(window.devicePixelRatio||1);
+  el.appendChild(renderer.domElement);
+
+  // Lights
+  const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+  sun.position.set(30,60,20); scene.add(sun);
+  scene.add(new THREE.AmbientLight(0xf7e9c8, 0.6));
+
+  // Ground
+  const ground = new THREE.Mesh(new THREE.CylinderGeometry(28,28,1,64), new THREE.MeshLambertMaterial({color:0x8eb96f}));
+  ground.position.y=-0.5; scene.add(ground);
+
+  // Palisade wall: ring of posts
+  const posts = new THREE.Group();
+  const postGeo = new THREE.CylinderGeometry(0.25,0.35,4,6);
+  const postMat = new THREE.MeshLambertMaterial({color:0x7a5a32});
+  const count=64, R=26.5;
+  for(let i=0;i<count;i++){
+    const a = i/count*Math.PI*2;
+    const m = new THREE.Mesh(postGeo,postMat);
+    m.position.set(Math.cos(a)*R,1.8,Math.sin(a)*R);
+    m.rotation.y = -a;
+    posts.add(m);
+  }
+  scene.add(posts);
+
+  // Simple plaza circle
+  const plaza = new THREE.Mesh(new THREE.CylinderGeometry(4.8,4.8,0.2,32), new THREE.MeshLambertMaterial({color:0xe6d6b7}));
+  plaza.position.y=0; scene.add(plaza);
+
+  // Building layout positions (around a circle)
+  const layoutOrder = ['townCenter','townPlaza','lumbermill','clayMine','ironMine','farm','houses','market','barracks','archerCamp','stable','wall'];
+  const radius=18;
+  layoutOrder.forEach((id,idx)=>{
+    const angle = (idx/layoutOrder.length)*Math.PI*2 + Math.PI/12;
+    const x = Math.cos(angle)*radius, z = Math.sin(angle)*radius;
+    const g = makeBuildingMesh(id);
+    g.position.set(x,0,z);
+    g.lookAt(0,0,0);
+    scene.add(g); meshes[id]=g;
+  });
+
+  // Raycaster for hover/click
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2();
+  el.addEventListener('mousemove', e=>{
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX-rect.left)/rect.width)*2 - 1;
+    mouse.y = -((e.clientY-rect.top)/rect.height)*2 + 1;
+  });
+  el.addEventListener('click', on3DClick);
+
+  window.addEventListener('resize', ()=>{
+    const w2 = el.clientWidth, h2 = el.clientHeight;
+    camera.aspect = w2/h2; camera.updateProjectionMatrix();
+    renderer.setSize(w2,h2);
+  });
+
+  animate3D();
+}
+function makeBuildingMesh(id){
+  const group = new THREE.Group();
+  const lvl = buildingLevel(id);
+  // base plinth
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(2.6,2.6,0.35,16), new THREE.MeshLambertMaterial({color:0xd9c79c}));
+  base.position.y=0.175; group.add(base);
+  // actual "building" shapes per type
+  let core;
+  const wood = 0x835634, stone=0x9a9a9a, roof=0xaa3a2a, thatch=0xcbb44a, canvas=0xe8d3a3;
+  switch(id){
+    case 'townCenter':
+      core = new THREE.Mesh(new THREE.BoxGeometry(3.2,3.2,3.2), new THREE.MeshLambertMaterial({color:stone}));
+      core.position.y=1.8; group.add(core);
+      group.add(makeRoof(3.6,1.2,roof,2.6));
+      break;
+    case 'townPlaza':
+      core = new THREE.Mesh(new THREE.CylinderGeometry(2,2,1.2,12), new THREE.MeshLambertMaterial({color:0xc9b28c}));
+      core.position.y=0.9; group.add(core);
+      break;
+    case 'lumbermill':
+      core = new THREE.Mesh(new THREE.BoxGeometry(3,1.6,2.4), new THREE.MeshLambertMaterial({color:wood}));
+      core.position.y=1.1; group.add(core);
+      group.add(makeRoof(3.2,1.0,thatch,2.2));
+      break;
+    case 'clayMine':
+      core = new THREE.Mesh(new THREE.ConeGeometry(1.6,1.4,8), new THREE.MeshLambertMaterial({color:0xb5653e}));
+      core.position.y=1.2; group.add(core);
+      break;
+    case 'ironMine':
+      core = new THREE.Mesh(new THREE.ConeGeometry(1.6,1.6,6), new THREE.MeshLambertMaterial({color:0x6d6d75}));
+      core.position.y=1.3; group.add(core);
+      break;
+    case 'farm':
+      core = new THREE.Mesh(new THREE.BoxGeometry(2.6,0.6,2.6), new THREE.MeshLambertMaterial({color:0xc8d87a}));
+      core.position.y=0.6; group.add(core);
+      break;
+    case 'houses':
+      for(let i=0;i<3;i++){
+        const h = new THREE.Mesh(new THREE.BoxGeometry(1.2,1.2,1.2), new THREE.MeshLambertMaterial({color:0xd6c6a5}));
+        h.position.set((i-1)*0.9,0.8,(i%2?0.6:-0.6)); group.add(h);
+        const r = new THREE.Mesh(new THREE.ConeGeometry(0.9,0.6,4), new THREE.MeshLambertMaterial({color:roof}));
+        r.position.copy(h.position); r.position.y+=1.0; group.add(r);
+      }
+      break;
+    case 'market':
+      core = new THREE.Mesh(new THREE.BoxGeometry(2.6,1.2,2.0), new THREE.MeshLambertMaterial({color:0xd9c79c}));
+      core.position.y=1.0; group.add(core);
+      const awning = new THREE.Mesh(new THREE.PlaneGeometry(2.6,1.6), new THREE.MeshLambertMaterial({color:canvas, side:THREE.DoubleSide}));
+      awning.rotation.x=-Math.PI/2; awning.position.set(0,1.8,0); group.add(awning);
+      break;
+    case 'barracks':
+      core = new THREE.Mesh(new THREE.BoxGeometry(3.4,1.4,1.8), new THREE.MeshLambertMaterial({color:stone}));
+      core.position.y=1.1; group.add(core);
+      group.add(makeRoof(3.6,0.9,thatch,1.8));
+      break;
+    case 'archerCamp':
+      core = new THREE.Mesh(new THREE.BoxGeometry(2.8,1.2,1.6), new THREE.MeshLambertMaterial({color:wood}));
+      core.position.y=1.0; group.add(core);
+      break;
+    case 'stable':
+      core = new THREE.Mesh(new THREE.BoxGeometry(3.2,1.4,2.0), new THREE.MeshLambertMaterial({color:0xcaa06a}));
+      core.position.y=1.1; group.add(core);
+      break;
+    case 'wall':
+      // small guard tower
+      core = new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.2,2.6,8), new THREE.MeshLambertMaterial({color:stone}));
+      core.position.y=1.6; group.add(core);
+      break;
+  }
+  updateBuildingMeshScale(group, lvl);
+  group.userData.id=id;
+  return group;
+}
+function makeRoof(sizeX, height, color, sizeZ){
+  const r = new THREE.Mesh(new THREE.ConeGeometry(Math.max(sizeX,sizeZ)/2, height, 4), new THREE.MeshLambertMaterial({color}));
+  r.rotation.y=Math.PI/4; r.position.y=2.1; return r;
+}
+function updateBuildingMeshScale(group, lvl){
+  const s = 0.9 + lvl*0.08; group.scale.set(s, 0.9 + lvl*0.12, s);
+}
+function updateBuildingMesh(id){
+  const g = meshes[id]; if(!g) return;
+  updateBuildingMeshScale(g, buildingLevel(id));
+}
+function animate3D(){
+  requestAnimationFrame(animate3D);
+  // hover detection
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(Object.values(meshes), true);
+  if(intersects.length>0){
+    const obj = intersects[0].object;
+    let p=obj; while(p && !p.userData.id) p=p.parent;
+    if(p && p.userData.id){
+      const id=p.userData.id;
+      labelTip.style.display='block';
+      labelTip.textContent = BUILDINGS[id].name + ' — Lvl ' + buildingLevel(id);
+      // position tip near mouse (already absolute)
+      // (No need to set here; CSS keeps it top-left)
+    }
+  }else{
+    labelTip.style.display='none';
+  }
+  renderer.render(scene,camera);
+}
+function on3DClick(e){
+  const rect = renderer.domElement.getBoundingClientRect();
+  const mx = ((e.clientX-rect.left)/rect.width)*2 - 1;
+  const my = -((e.clientY-rect.top)/rect.height)*2 + 1;
+  raycaster.setFromCamera({x:mx,y:my}, camera);
+  const intersects = raycaster.intersectObjects(Object.values(meshes), true);
+  if(intersects.length>0){
+    let p=intersects[0].object; while(p && !p.userData.id) p=p.parent;
+    if(p && p.userData.id){
+      const id=p.userData.id;
+      const card = document.querySelector('[data-card=\"'+id+'\"]');
+      if(card){ card.scrollIntoView({behavior:'smooth', block:'center'}); card.style.outline='3px solid #2f7a3e'; setTimeout(()=>card.style.outline='',1200); }
+    }
+  }
+}
+function update3DLabels(){ /* hover tip kept simple */ }
+function init3DStateSync(){
+  // When resetting, bump all mesh scales to level 1
+  Object.keys(meshes).forEach(id=>updateBuildingMesh(id));
+}
+
+init3D();
 window.addEventListener('beforeunload', saveState);
 render();
 requestAnimationFrame(gameTick);
-
 </script>
 </body>
 </html>
