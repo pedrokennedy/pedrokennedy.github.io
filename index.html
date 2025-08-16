@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Village Wars — Regras estilo Tribal</title>
+<title>Village Wars — TW Regras (Fix Click)</title>
 <style>
   :root{ --bg:#e9dec1;--panel:#f7f0db;--wood:#8b5a2b;--wood-dark:#5d3b1a;--ink:#3a2a17;
          --muted:#6f5a40;--accent:#2f7a3e;--border:#d2c3a3; }
@@ -40,7 +40,8 @@
   #scene3d::after{content:"";pointer-events:none;position:absolute;inset:-20%;background:radial-gradient(120% 80% at 50% 30%, rgba(255,255,255,0.0) 40%, rgba(0,0,0,.15) 85%);mix-blend-mode:multiply}
   #hover-tip{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.92);border:1px solid var(--border);padding:4px 8px;border-radius:8px;font-size:12px;display:none}
   input[type="number"],select{background:#faf2db;border:1px solid var(--border);border-radius:8px;padding:7px 8px}
-  #toast{position:fixed;right:12px;bottom:12px;display:none;background:#2f7a3e;color:#fff;border:2px solid #20582a;border-radius:10px;padding:8px 12px;font-weight:800;box-shadow:0 4px 0 #18441f}
+  #toast{position:fixed;right:12px;bottom:12px;display:none;background:#2f7a3e;color:#fff;border:2px solid #20582a;border-radius:10px;padding:10px 14px;font-weight:900;box-shadow:0 4px 0 #18441f}
+  #toast.error{background:#a32a2a;border-color:#701818}
 </style>
 </head>
 <body>
@@ -182,13 +183,11 @@ import * as THREE from "https://unpkg.com/three@0.158.0/build/three.module.js";
 const fmt = (n)=>Math.floor(n).toLocaleString('pt-BR');
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
 const deepClone = (o)=>JSON.parse(JSON.stringify(o));
-const toPct=(x)=>Math.round(x*100);
-
-/* Toast */
-function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(toast._id); toast._id=setTimeout(()=>t.style.display='none',1400);}
+const qs = (sel,root=document)=>root.querySelector(sel);
+function toast(msg, isErr=false){ const t=qs('#toast'); t.textContent=msg; t.className=isErr?'error':''; t.style.display='block'; clearTimeout(toast._id); toast._id=setTimeout(()=>t.style.display='none',1600);}
+window.addEventListener('error', (e)=>{ console.error(e.error||e.message); toast('Erro: '+(e.message||'ver console'), true); });
 
 /* ===== Design data ===== */
-// Max levels & effects
 const BUILDINGS = {
   hq:{nome:'Edifício Principal (HQ)', max:30, baseCost:{wood:200,clay:200,iron:150,food:0}, costMult:2.0, efeito:(lvl)=>({})},
   quartel:{nome:'Quartel', max:25, baseCost:{wood:120,clay:100,iron:80,food:30}, costMult:2.0, efeito:(lvl)=>({atkMul_quartel:0.10*lvl})},
@@ -208,9 +207,8 @@ const BUILDINGS = {
   academia:{nome:'Academia', max:25, baseCost:{wood:260,clay:220,iron:260,food:120}, costMult:2.0, efeito:(lvl)=>({atkMul_academia:0.10*lvl})},
   igreja:{nome:'Igreja', max:25, baseCost:{wood:200,clay:200,iron:240,food:140}, costMult:2.0, efeito:(lvl)=>({atkMul_igreja:0.10*lvl})},
 };
-// Production curve: 30/min at L1 to ~2400/min at L30
 const PROD_BASE_PER_SEC = 0.5; // 30/min
-const PROD_FACTOR = Math.pow(80, 1/29); // ~1.163... so L30 ~ 40/s
+const PROD_FACTOR = Math.pow(80, 1/29); // ~1.163 → L30 ~ 40/s
 
 const UNITS = {
   spear:{nome:'Lanceiro', atk:5, hp:12, pop:1, predio:'quartel', custo:{wood:30,clay:40,iron:20,food:10}},
@@ -223,8 +221,6 @@ const UNITS = {
   mage:{nome:'Mago', atk:45, hp:35, pop:2, predio:'academia', custo:{wood:160,clay:140,iron:180,food:70}},
   novice:{nome:'Noviço', atk:18, hp:28, pop:1, predio:'igreja', custo:{wood:90,clay:80,iron:100,food:40}},
 };
-
-// Ferreiro — pesquisas simples
 const TECHS = {
   blades:{nome:'Lâminas Afiadas', desc:'+10% ATK de Lanceiro/Espadachim/Cavaleiro', custo:{wood:300,clay:300,iron:300,food:200}},
   logistics:{nome:'Logística Eficiente', desc:'+10% produção de recursos', custo:{wood:400,clay:400,iron:400,food:250}},
@@ -232,412 +228,271 @@ const TECHS = {
 };
 
 /* ===== Estado ===== */
-function defaultBuildings(){
-  const b={};
-  for(const k of Object.keys(BUILDINGS)) b[k]=0;
-  b.hq=1; b.fazenda=1; b.armazem=1; // começar funcionais
-  return b;
-}
-const DEFAULT_STATE = {
-  recursos:{wood:200,clay:200,iron:200,food:120},
-  predios: defaultBuildings(),
-  unidades:{}, // preenchido dinamicamente
-  techs:{},
-  missao:null, log:[],
-  reservPop:0,
-};
+function defaultBuildings(){ const b={}; for(const k of Object.keys(BUILDINGS)) b[k]=0; b.hq=1; b.fazenda=1; b.armazem=1; return b; }
+const DEFAULT_STATE={ recursos:{wood:200,clay:200,iron:200,food:120}, predios:defaultBuildings(), unidades:{}, techs:{}, missao:null, log:[], reservPop:0 };
 for(const u in UNITS) DEFAULT_STATE.unidades[u]=0;
-
-let S = carregar();
-function carregar(){ try{ const raw=localStorage.getItem('vw-tw'); if(raw) return {...DEFAULT_STATE, ...JSON.parse(raw)} }catch(e){} return deepClone(DEFAULT_STATE) }
-function salvar(){ localStorage.setItem('vw-tw', JSON.stringify(S)) }
+let S = load(); function load(){ try{ const raw=localStorage.getItem('vw-tw'); if(raw) return {...DEFAULT_STATE, ...JSON.parse(raw)} }catch(e){} return deepClone(DEFAULT_STATE) }
+function save(){ localStorage.setItem('vw-tw', JSON.stringify(S)) }
 
 /* ===== Regras ===== */
-const nivel = (id)=>S.predios[id]||0;
+const nivel=(id)=>S.predios[id]||0;
 function efeitos(){
-  const e={popMax:0,capacidade:500}; // cap inicial
-  for(const [id,def] of Object.entries(BUILDINGS)){
-    const lvl=nivel(id);
-    if(def.efeito){ const add=def.efeito(lvl)||{}; for(const k in add){ e[k]=(e[k]||0)+add[k] } }
-  }
-  // Mínimos úteis
-  e.popMax = Math.max(e.popMax, 30);
-  e.capacidade = Math.max(e.capacidade, 1000);
-  return e;
+  const e={popMax:0,capacidade:500};
+  for(const [id,def] of Object.entries(BUILDINGS)){ const lvl=nivel(id); if(def.efeito){ const add=def.efeito(lvl)||{}; for(const k in add){ e[k]=(e[k]||0)+add[k] } } }
+  e.popMax=Math.max(e.popMax,30); e.capacidade=Math.max(e.capacidade,1000); return e;
 }
-const storageCap = ()=>efeitos().capacidade;
-const popCap = ()=>efeitos().popMax;
-const usedPop = ()=>Object.entries(S.unidades).reduce((a,[t,n])=>a+n*(UNITS[t].pop||0),0);
-const freePop = ()=>Math.max(0, popCap()-usedPop()-S.reservPop);
+const storageCap=()=>efeitos().capacidade;
+const popCap=()=>efeitos().popMax;
+const usedPop=()=>Object.entries(S.unidades).reduce((a,[t,n])=>a+n*(UNITS[t].pop||0),0);
+const freePop=()=>Math.max(0,popCap()-usedPop()-S.reservPop);
 
-function podePagar(c){ return Object.entries(c).every(([k,v])=>(S.recursos[k]||0)>=v) }
-function pagar(c){ for(const [k,v] of Object.entries(c)){ S.recursos[k]-=v } }
-function custoPredio(id){
-  const def=BUILDINGS[id], lvl=nivel(id);
-  const c={};
-  for(const r of ['wood','clay','iron','food']) c[r]=Math.floor((def.baseCost[r]||0)*Math.pow(def.costMult, Math.max(0,lvl)));
-  return c;
-}
+function canPay(c){ return Object.entries(c).every(([k,v])=>(S.recursos[k]||0)>=v) }
+function pay(c){ for(const [k,v] of Object.entries(c)){ S.recursos[k]-=v } }
+function costBuilding(id){ const def=BUILDINGS[id], lvl=nivel(id); const c={}; for(const r of ['wood','clay','iron','food']) c[r]=Math.floor((def.baseCost[r]||0)*Math.pow(def.costMult, Math.max(0,lvl))); return c; }
+
 function upgrade(id){
   const def=BUILDINGS[id]; const lvl=nivel(id);
-  if(id!=='hq' && lvl>=S.predios.hq) return toast('Limite do HQ. Aumente o HQ primeiro.');
-  if(lvl>=def.max) return toast('Nível máximo atingido.');
-  const c=custoPredio(id); if(!podePagar(c)) return toast('Recursos insuficientes.');
-  pagar(c); S.predios[id]=lvl+1; updateMesh(id); toast((lvl===0?'Construído: ':'Upgraded: ')+def.nome+' (N'+(lvl+1)+'/'+def.max+')');
-  render();
+  if(id!=='hq' && lvl>=S.predios.hq) return toast('Limite do HQ. Aumente o HQ primeiro.', true);
+  if(lvl>=def.max) return toast('Nível máximo atingido.', true);
+  const c=costBuilding(id); if(!canPay(c)) return toast('Recursos insuficientes.', true);
+  pay(c); S.predios[id]=lvl+1; updateMesh(id); toast((lvl===0?'Construído: ':'Aprimorado: ')+def.nome+' (N'+(lvl+1)+'/'+def.max+')'); render();
 }
 
-function prodPorSegundo(){
+function prodPerSec(){
   const r={wood:0,clay:0,iron:0,food:0};
-  // Edifícios de recurso
-  const m = {'bosque':'wood','argila':'clay','ferro':'iron'};
-  for(const [bid,typ] of Object.entries(m)){
-    const lvl=nivel(bid);
-    if(lvl>0){
-      const perSec = PROD_BASE_PER_SEC*Math.pow(PROD_FACTOR, lvl-1);
-      r[typ]+=perSec;
-    }
-  }
-  // Comida: podemos simplificar como ~20% da madeira? manter pequena
+  const m={'bosque':'wood','argila':'clay','ferro':'iron'};
+  for(const [bid,typ] of Object.entries(m)){ const lvl=nivel(bid); if(lvl>0){ r[typ]+=PROD_BASE_PER_SEC*Math.pow(PROD_FACTOR,lvl-1); } }
   r.food += 0.2*(r.wood+r.clay+r.iron)/3;
-  // Tech logística
   if(S.techs.logistics) for(const k of ['wood','clay','iron','food']) r[k]*=1.10;
   return r;
 }
-
-function taxaMercado(){
-  const lvl=nivel('mercado');
-  let fee = 2.5 - 0.10*(Math.max(1,lvl)-1); // 250% - 10%/nível
-  fee = Math.max(0.10, fee); // mínimo 10%
-  return fee;
-}
-
-function multAtk(tipo){
-  // +10%/nível do prédio gerador; tech blades +10% em melee (spear/sword/knight)
-  const p = UNITS[tipo].predio;
-  let m = 1.0;
-  const lvl = nivel(p);
-  if(p==='quartel') m *= 1 + 0.10*lvl;
-  if(p==='estabulo') m *= 1 + 0.10*lvl;
-  if(p==='oficina') m *= 1 + 0.10*lvl;
-  if(p==='esconderijo') m *= 1 + 0.10*lvl;
-  if(p==='academia') m *= 1 + 0.10*lvl;
-  if(p==='igreja') m *= 1 + 0.10*lvl;
-  if(S.techs.blades && (tipo==='spear'||tipo==='sword'||tipo==='knight')) m *= 1.10;
+function marketFee(){ const lvl=nivel('mercado'); let fee = 2.5 - 0.10*(Math.max(1,lvl)-1); return Math.max(0.10, fee); }
+function atkMul(tipo){
+  const p=UNITS[tipo].predio; let m=1; const lvl=nivel(p);
+  if(['quartel','estabulo','oficina','esconderijo','academia','igreja'].includes(p)) m*=1+0.10*lvl;
+  if(S.techs.blades && (tipo==='spear'||tipo==='sword'||tipo==='knight')) m*=1.10;
   return m;
 }
-function multHP(tipo){
-  // usar mesmo multiplicador para HP
-  return multAtk(tipo);
-}
+const hpMul=(tipo)=>atkMul(tipo);
 
-function treinar(tipo, qtd){
+function train(tipo,q){
   const u=UNITS[tipo]; const pred=u.predio;
-  if(nivel(pred)<1) return toast('Requer '+BUILDINGS[pred].nome+' N1');
-  if(u.unico && S.unidades[tipo]>=1) return toast('Paladino é único.');
-  qtd = Math.max(0, Math.floor(qtd));
-  if(qtd<=0) return;
-  const popNec=u.pop*qtd; if(popNec>freePop()) return toast('População insuficiente (aumente a Fazenda).');
-  const total = {wood:u.custo.wood*qtd,clay:u.custo.clay*qtd,iron:u.custo.iron*qtd,food:u.custo.food*qtd};
-  if(!podePagar(total)) return toast('Recursos insuficientes.');
-  pagar(total); S.unidades[tipo]+=qtd; toast('Treinados '+qtd+' '+u.nome+(qtd>1?'s':'')); render();
+  if(nivel(pred)<1) return toast('Requer '+BUILDINGS[pred].nome+' N1', true);
+  if(u.unico && S.unidades[tipo]>=1) return toast('Paladino é único.', true);
+  q=Math.max(0,Math.floor(q)); if(q<=0) return;
+  const pop=u.pop*q; if(pop>freePop()) return toast('População insuficiente (aumente a Fazenda).', true);
+  const total={wood:u.custo.wood*q,clay:u.custo.clay*q,iron:u.custo.iron*q,food:u.custo.food*q};
+  if(!canPay(total)) return toast('Recursos insuficientes.', true);
+  pay(total); S.unidades[tipo]+=q; toast('Treinados '+q+' '+u.nome+(q>1?'s':'')); render();
 }
 
-/* ===== Missões ===== */
-function precisaPraca(){ return nivel('praca')<1 }
-function duracaoMissao(diff){ return diff===1?45000: (diff===2?60000:90000) }
-function gerarOndas(diff){ const arr=[]; let base=75*diff; for(let i=1;i<=3;i++){ const mult=Math.pow(1.55,i-1); const jitter=0.9+Math.random()*0.2; arr.push({poder:Math.floor(base*mult*jitter),res:null}); } return arr; }
-function enviarMissao(diff, envio){
-  if(precisaPraca()) return toast('Construa a Praça de Reuniões para enviar missões.');
-  for(const t in envio){ if(envio[t]>(S.unidades[t]||0)) return toast('Unidades insuficientes.'); }
-  const popEnv = Object.entries(envio).reduce((a,[t,n])=>a+n*UNITS[t].pop,0);
-  S.reservPop += popEnv;
+/* Missões */
+const needRally=()=>nivel('praca')<1;
+const missionDur=(d)=>d===1?45000:(d===2?60000:90000);
+function waves(d){ const arr=[]; let base=75*d; for(let i=1;i<=3;i++){ const mult=Math.pow(1.55,i-1); const jitter=0.9+Math.random()*0.2; arr.push({poder:Math.floor(base*mult*jitter),res:null}); } return arr; }
+function sendMission(d, envio){
+  if(needRally()) return toast('Construa a Praça de Reuniões para enviar missões.', true);
+  for(const t in envio){ if(envio[t]>(S.unidades[t]||0)) return toast('Unidades insuficientes.', true); }
+  const popEnv=Object.entries(envio).reduce((a,[t,n])=>a+n*UNITS[t].pop,0); S.reservPop+=popEnv;
   for(const t in envio) S.unidades[t]-=envio[t];
-  const now=Date.now(); const fim=now+duracaoMissao(diff);
-  S.missao={diff,envio,ini:now,fim,ondas:gerarOndas(diff)}; toast('Missão enviada!'); renderMissoes();
+  const now=Date.now(); const fim=now+missionDur(d);
+  S.missao={diff:d,envio,ini:now,fim,ondas:waves(d)}; toast('Missão enviada!'); renderMissions();
 }
-function simularMissao(){
+function simulateMission(){
   const M=S.missao; if(!M) return;
-  const cur=deepClone(M.envio);
-  let ATK=0, HP=0;
-  for(const t in cur){ const n=cur[t]; ATK += n*UNITS[t].atk*multAtk(t); HP += n*UNITS[t].hp*multHP(t); }
-  const mit=nivel('muralha')>0? BUILDINGS.muralha.efeito(nivel('muralha')).mitig : 0;
-  if(S.techs.fortify) HP*=1.10;
-  let sucesso=true;
-  for(const w of M.ondas){
-    const under=Math.max(1, w.poder/Math.max(1,ATK));
-    const dano=w.poder*under*(1-mit);
-    HP -= dano;
-    w.res = (HP>0)?'sobreviveu':'derrotado';
-    if(HP<=0){ sucesso=false; break; }
-  }
-  // perdas proporcionais
-  let perda=0;
-  if(!sucesso){ perda=0.7; } else { perda=0.15*(1-mit); }
-  const baixa={}, rest={};
-  for(const t in cur){ const n=cur[t]; const lost=Math.min(n, Math.floor(n*perda)); baixa[t]=lost; rest[t]=n-lost; }
-  // recompensa simples
-  const mult = sucesso?1.0:0.4;
-  const base= (M.diff===1?180:(M.diff===2?320:520))*mult;
+  const cur=deepClone(M.envio); let ATK=0,HP=0;
+  for(const t in cur){ const n=cur[t]; ATK+=n*UNITS[t].atk*atkMul(t); HP+=n*UNITS[t].hp*hpMul(t); }
+  const mit=nivel('muralha')>0?BUILDINGS.muralha.efeito(nivel('muralha')).mitig:0; if(S.techs.fortify) HP*=1.10;
+  let ok=true;
+  for(const w of M.ondas){ const under=Math.max(1,w.poder/Math.max(1,ATK)); const dano=w.poder*under*(1-mit); HP-=dano; w.res=(HP>0)?'sobreviveu':'derrotado'; if(HP<=0){ ok=false; break; } }
+  const perda = ok? 0.15*(1-mit):0.7;
+  const baixa={}, rest={}; for(const t in cur){ const n=cur[t]; const lost=Math.min(n,Math.floor(n*perda)); baixa[t]=lost; rest[t]=n-lost; }
+  const mult=ok?1.0:0.4, base=(M.diff===1?180:(M.diff===2?320:520))*mult;
   const recompensa={wood:Math.floor(base*(0.9+Math.random()*0.3)),clay:Math.floor(base*(0.9+Math.random()*0.3)),iron:Math.floor(base*(0.9+Math.random()*0.3)),food:Math.floor(0.6*base*(0.9+Math.random()*0.3))};
-  return {sucesso,baixa,rest,recompensa};
+  return {ok,baixa,rest,recompensa};
 }
-function finalizarMissao(){
+function finishMission(){
   const M=S.missao; if(!M) return;
-  const r=simularMissao();
-  const popEnv = Object.entries(M.envio).reduce((a,[t,n])=>a+n*UNITS[t].pop,0);
-  S.reservPop -= popEnv;
+  const r=simulateMission();
+  const popEnv=Object.entries(M.envio).reduce((a,[t,n])=>a+n*UNITS[t].pop,0); S.reservPop-=popEnv;
   for(const t in r.rest) S.unidades[t]+=r.rest[t];
-  if(r.sucesso){ for(const k in r.recompensa){ S.recursos[k]+=r.recompensa[k] } toast('Missão concluída!'); } else toast('Missão falhou.');
-  S.log.unshift({quando:new Date().toLocaleString('pt-BR'), diff:M.diff, sucesso:r.sucesso, envio:M.envio, baixa:r.baixa, recompensa:r.sucesso?r.recompensa:null, ondas:M.ondas});
-  S.log=S.log.slice(0,6);
-  S.missao=null; render(); renderLog();
+  if(r.ok){ for(const k in r.recompensa) S.recursos[k]+=r.recompensa[k]; toast('Missão concluída!'); } else toast('Missão falhou.', true);
+  S.log.unshift({quando:new Date().toLocaleString('pt-BR'), diff:M.diff, sucesso:r.ok, envio:M.envio, baixa:r.baixa, recompensa:r.ok?r.recompensa:null, ondas:M.ondas});
+  S.log=S.log.slice(0,6); S.missao=null; render(); renderLog();
 }
 
-/* ===== Loop ===== */
+/* Loop */
 let last=Date.now();
 function tick(){
   const now=Date.now(), dt=(now-last)/1000; last=now;
-  const pr=prodPorSegundo();
-  for(const k of ['wood','clay','iron','food']){
-    S.recursos[k]+=(pr[k]||0)*dt;
-    S.recursos[k]=Math.min(S.recursos[k], storageCap());
-  }
-  if(S.missao && now>=S.missao.fim) finalizarMissao();
+  const pr=prodPerSec();
+  for(const k of ['wood','clay','iron','food']){ S.recursos[k]+= (pr[k]||0)*dt; S.recursos[k]=Math.min(S.recursos[k], storageCap()); }
+  if(S.missao && now>=S.missao.fim) finishMission();
   render();
   requestAnimationFrame(tick);
 }
 
-/* ===== UI ===== */
-function renderTopo(){
-  const p=prodPorSegundo(), eff=efeitos();
-  document.getElementById('r-wood').textContent=fmt(S.recursos.wood);
-  document.getElementById('r-clay').textContent=fmt(S.recursos.clay);
-  document.getElementById('r-iron').textContent=fmt(S.recursos.iron);
-  document.getElementById('r-food').textContent=fmt(S.recursos.food);
-  document.getElementById('p-wood').textContent='+'+(p.wood||0).toFixed(2)+'/s';
-  document.getElementById('p-clay').textContent='+'+(p.clay||0).toFixed(2)+'/s';
-  document.getElementById('p-iron').textContent='+'+(p.iron||0).toFixed(2)+'/s';
-  document.getElementById('p-food').textContent='+'+(p.food||0).toFixed(2)+'/s';
-  document.getElementById('pop').textContent=(usedPop()+S.reservPop)+'/'+eff.popMax;
-  document.getElementById('store').textContent=fmt(eff.capacidade);
+/* UI Render */
+function renderTop(){
+  const p=prodPerSec(), eff=efeitos();
+  qs('#r-wood').textContent=fmt(S.recursos.wood);
+  qs('#r-clay').textContent=fmt(S.recursos.clay);
+  qs('#r-iron').textContent=fmt(S.recursos.iron);
+  qs('#r-food').textContent=fmt(S.recursos.food);
+  qs('#p-wood').textContent='+'+(p.wood||0).toFixed(2)+'/s';
+  qs('#p-clay').textContent='+'+(p.clay||0).toFixed(2)+'/s';
+  qs('#p-iron').textContent='+'+(p.iron||0).toFixed(2)+'/s';
+  qs('#p-food').textContent='+'+(p.food||0).toFixed(2)+'/s';
+  qs('#pop').textContent=(usedPop()+S.reservPop)+'/'+eff.popMax;
+  qs('#store').textContent=fmt(eff.capacidade);
 }
-function renderPredios(){
-  const c=document.getElementById('buildings'); c.innerHTML='';
+function renderBuildings(){
+  const c=qs('#buildings'); c.innerHTML='';
   for(const [id,def] of Object.entries(BUILDINGS)){
-    const lvl=nivel(id), cst=custoPredio(id);
+    const lvl=nivel(id), cst=costBuilding(id);
     const card=document.createElement('div'); card.className='card'; card.dataset.card=id;
-    const limStr = (id!=='hq'?' / Limite HQ: '+S.predios.hq:'') + ' / Máx: '+def.max;
+    const limStr=(id!=='hq'?' / Limite HQ: '+S.predios.hq:'')+' / Máx: '+def.max;
     card.innerHTML='<div class="row"><div><div class="name">'+def.nome+'</div><span class="badge">Nível '+lvl+limStr+'</span></div><div class="actions"><button data-up="'+id+'" class="primary">'+(lvl===0?'Construir':'Aprimorar')+'</button></div></div><div class="costs"><span>Custo:</span><span>🪵 '+fmt(cst.wood||0)+'</span><span>🧱 '+fmt(cst.clay||0)+'</span><span>⛓️ '+fmt(cst.iron||0)+'</span><span>🥖 '+fmt(cst.food||0)+'</span><span>⚡ Instantâneo</span></div>';
     c.appendChild(card);
   }
-  c.querySelectorAll('button[data-up]').forEach(b=>b.onclick=()=>upgrade(b.getAttribute('data-up')));
 }
-function renderTreino(){
-  const box=document.getElementById('training-cards'); box.innerHTML='';
+function renderTrain(){
+  const box=qs('#training-cards'); box.innerHTML='';
   for(const [id,u] of Object.entries(UNITS)){
     const pred=u.predio, lvl=nivel(pred), lock=lvl<1, c=u.custo;
     const card=document.createElement('div'); card.className='card';
-    const unico = u.unico? ' • único': '';
+    const unico=u.unico?' • único':'';
     card.innerHTML='<div class="row"><div><div class="name">'+u.nome+'</div><span class="badge">'+BUILDINGS[pred].nome+' N'+lvl+unico+'</span></div><div class="actions">'+(lock?'<button disabled>Treinar</button>':'<input type="number" min="1" value="1" id="q-'+id+'"><button data-tr="'+id+'" class="primary">Treinar</button>')+'</div></div><div class="costs"><span>Por unidade:</span><span>🪵 '+fmt(c.wood)+'</span><span>🧱 '+fmt(c.clay)+'</span><span>⛓️ '+fmt(c.iron)+'</span><span>🥖 '+fmt(c.food)+'</span><span>👥 '+u.pop+'</span></div>';
     box.appendChild(card);
   }
-  box.querySelectorAll('button[data-tr]').forEach(b=>b.onclick=()=>{ const id=b.getAttribute('data-tr'); const q=parseInt(document.getElementById('q-'+id).value||'0',10); treinar(id,q) });
 }
-function renderExercito(){
-  const tbody=document.getElementById('army-rows'); tbody.innerHTML='';
-  for(const [id,u] of Object.entries(UNITS)){
-    const tr=document.createElement('tr'); tr.innerHTML='<td>'+u.nome+'</td><td>'+fmt(S.unidades[id])+'</td><td>'+u.atk+'</td><td>'+u.hp+'</td><td>'+u.pop+'</td>';
-    tbody.appendChild(tr);
-  }
+function renderArmy(){
+  const tbody=qs('#army-rows'); tbody.innerHTML='';
+  for(const [id,u] of Object.entries(UNITS)){ const tr=document.createElement('tr'); tr.innerHTML='<td>'+u.nome+'</td><td>'+fmt(S.unidades[id])+'</td><td>'+u.atk+'</td><td>'+u.hp+'</td><td>'+u.pop+'</td>'; tbody.appendChild(tr); }
 }
-function renderMercado(){
-  const fee=taxaMercado(); const ret = Math.floor(100/(1+fee));
-  document.getElementById('trade-fee').textContent=Math.round(fee*100)+'%';
-  document.getElementById('trade-ret').textContent=ret.toLocaleString('pt-BR');
+function renderMarket(){
+  const fee=marketFee(); const ret=Math.floor(100/(1+fee));
+  qs('#trade-fee').textContent=Math.round(fee*100)+'%';
+  qs('#trade-ret').textContent=ret.toLocaleString('pt-BR');
 }
-function renderFerreiro(){
-  const box=document.getElementById('smith-techs'); box.innerHTML='';
-  const lvl=nivel('ferreiro');
-  for(const id in TECHS){
-    const t=TECHS[id];
-    const done=!!S.techs[id];
-    const card=document.createElement('div'); card.className='card';
-    card.innerHTML='<div class="row"><div><div class="name">'+t.nome+'</div><div class="sub">'+t.desc+'</div></div><div class="actions">'+(lvl<1?'<button disabled>Ferreiro N1</button>': (done?'<button disabled>Pesquisado</button>':'<button data-tech="'+id+'" class="primary">Pesquisar</button>'))+'</div></div><div class="costs"><span>Custo:</span><span>🪵 '+fmt(t.custo.wood)+'</span><span>🧱 '+fmt(t.custo.clay)+'</span><span>⛓️ '+fmt(t.custo.iron)+'</span><span>🥖 '+fmt(t.custo.food)+'</span></div>';
-    box.appendChild(card);
-  }
-  box.querySelectorAll('button[data-tech]').forEach(b=>b.onclick=()=>{ const id=b.getAttribute('data-tech'); const c=TECHS[id].custo; if(!podePagar(c)) return toast('Recursos insuficientes.'); pagar(c); S.techs[id]=true; toast('Pesquisa concluída!'); renderFerreiro(); });
+function renderSmith(){
+  const box=qs('#smith-techs'); box.innerHTML=''; const lvl=nivel('ferreiro');
+  for(const id in TECHS){ const t=TECHS[id]; const done=!!S.techs[id]; const card=document.createElement('div'); card.className='card';
+    card.innerHTML='<div class="row"><div><div class="name">'+t.nome+'</div><div class="sub">'+t.desc+'</div></div><div class="actions">'+(lvl<1?'<button disabled>Ferreiro N1</button>':(done?'<button disabled>Pesquisado</button>':'<button data-tech="'+id+'" class="primary">Pesquisar</button>'))+'</div></div><div class="costs"><span>Custo:</span><span>🪵 '+fmt(t.custo.wood)+'</span><span>🧱 '+fmt(t.custo.clay)+'</span><span>⛓️ '+fmt(t.custo.iron)+'</span><span>🥖 '+fmt(t.custo.food)+'</span></div>'; box.appendChild(card); }
 }
-function renderMissoes(){
-  const mit = (BUILDINGS.muralha.efeito(nivel('muralha')).mitig||0);
-  document.getElementById('wall-mit').textContent=Math.round(mit*100);
-  document.getElementById('hq-lvl').textContent=nivel('hq');
-  const M=S.missao, box=document.getElementById('mission-active');
-  if(M){
-    box.style.display=''; const now=Date.now(); const frac=clamp((now-M.ini)/(M.fim-M.ini),0,1);
-    document.getElementById('mq-bar').style.width=(frac*100)+'%';
-    document.getElementById('mq-eta').textContent='Retorna em ~'+Math.ceil((M.fim-now)/1000)+'s';
-    const tb=document.getElementById('mq-waves'); tb.innerHTML='';
-    M.ondas.forEach((w,i)=>{ const tr=document.createElement('tr'); tr.innerHTML='<td>'+(i+1)+'</td><td>'+fmt(w.poder)+'</td><td>'+(w.res||'—')+'</td>'; tb.appendChild(tr); });
+function renderMissions(){
+  const mit=(BUILDINGS.muralha.efeito(nivel('muralha')).mitig||0); qs('#wall-mit').textContent=Math.round(mit*100); qs('#hq-lvl').textContent=nivel('hq');
+  const M=S.missao, box=qs('#mission-active');
+  if(M){ box.style.display=''; const now=Date.now(); const frac=clamp((now-M.ini)/(M.fim-M.ini),0,1); qs('#mq-bar').style.width=(frac*100)+'%'; qs('#mq-eta').textContent='Retorna em ~'+Math.ceil((M.fim-now)/1000)+'s';
+    const tb=qs('#mq-waves'); tb.innerHTML=''; M.ondas.forEach((w,i)=>{ const tr=document.createElement('tr'); tr.innerHTML='<td>'+(i+1)+'</td><td>'+fmt(w.poder)+'</td><td>'+(w.res||'—')+'</td>'; tb.appendChild(tr); });
   }else box.style.display='none';
 }
 function renderLog(){
-  const list=document.getElementById('mission-log'); list.innerHTML='';
-  for(const e of S.log){
-    const d=document.createElement('div'); d.className='card';
-    d.innerHTML='<div class="row"><div class="name">'+(e.sucesso?'✅ Sucesso':'❌ Falha')+'</div><span class="badge">Dif. '+e.diff+'</span><span class="badge">'+e.quando+'</span></div><div class="sub">Enviadas: '+Object.entries(e.envio).map(([t,n])=>UNITS[t].nome+'×'+n).join(', ')+'</div><div class="sub">Baixas: '+Object.entries(e.baixa).map(([t,n])=>UNITS[t].nome+'×'+n).join(', ')+'</div>'+(e.sucesso?'<div class="costs"><span>Saques:</span><span>🪵 '+fmt(e.recompensa.wood)+'</span><span>🧱 '+fmt(e.recompensa.clay)+'</span><span>⛓️ '+fmt(e.recompensa.iron)+'</span><span>🥖 '+fmt(e.recompensa.food)+'</span></div>':'') ;
-    list.appendChild(d);
-  }
+  const list=qs('#mission-log'); list.innerHTML='';
+  for(const e of S.log){ const d=document.createElement('div'); d.className='card'; d.innerHTML='<div class="row"><div class="name">'+(e.sucesso?'✅ Sucesso':'❌ Falha')+'</div><span class="badge">Dif. '+e.diff+'</span><span class="badge">'+e.quando+'</span></div><div class="sub">Enviadas: '+Object.entries(e.envio).map(([t,n])=>UNITS[t].nome+'×'+n).join(', ')+'</div><div class="sub">Baixas: '+Object.entries(e.baixa).map(([t,n])=>UNITS[t].nome+'×'+n).join(', ')+'</div>'+(e.sucesso?'<div class="costs"><span>Saques:</span><span>🪵 '+fmt(e.recompensa.wood)+'</span><span>🧱 '+fmt(e.recompensa.clay)+'</span><span>⛓️ '+fmt(e.recompensa.iron)+'</span><span>🥖 '+fmt(e.recompensa.food)+'</span></div>':''); list.appendChild(d); }
 }
-function render(){
-  renderTopo(); renderPredios(); renderTreino(); renderExercito(); renderMercado(); renderFerreiro(); renderMissoes();
-}
+function render(){ renderTop(); renderBuildings(); renderTrain(); renderArmy(); renderMarket(); renderSmith(); renderMissions(); }
 
-/* Ações */
-document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); const t=b.dataset.tab; ['unidades','missoes','mercado','ferreiro','exercito','ajuda'].forEach(id=>{ document.getElementById('tab-'+id).style.display=(id===t)?'':'none'; }); });
-document.getElementById('btn-save').onclick=()=>{ salvar(); toast('Salvo!'); };
-document.getElementById('btn-reset').onclick=()=>{ if(confirm('Apagar save e reiniciar?')){ localStorage.removeItem('vw-tw'); S=deepClone(DEFAULT_STATE); init3DSync(); toast('Save apagado.'); render(); } };
-document.getElementById('btn-trade').onclick=()=>{
-  const f=document.getElementById('trade-from').value, t=document.getElementById('trade-to').value;
-  if(f===t) return toast('Escolha recursos diferentes.');
-  const amt=parseInt(document.getElementById('trade-amt').value||'0',10); if(amt<=0) return;
-  if((S.recursos[f]||0)<amt) return toast('Quantidade insuficiente.');
-  const fee=taxaMercado(); const recv=Math.floor(amt/(1+fee));
-  S.recursos[f]-=amt; S.recursos[t]=Math.min(storageCap(), (S.recursos[t]||0)+recv);
-  toast('Troca feita: recebeu '+recv); renderTopo(); renderMercado();
+/* Delegação de cliques — FIX */
+qs('#buildings').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-up]');
+  if(!btn) return;
+  const id = btn.getAttribute('data-up');
+  console.log('Upgrade click:', id);
+  try{ upgrade(id); }catch(err){ console.error(err); toast('Erro no upgrade: '+err.message, true); }
+});
+qs('#training-cards').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-tr]'); if(!btn) return;
+  const id=btn.getAttribute('data-tr'); const qty=parseInt(qs('#q-'+id).value||'0',10); train(id, qty);
+});
+
+/* Tabs, botões e mercado */
+document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); const t=b.dataset.tab; ['unidades','missoes','mercado','ferreiro','exercito','ajuda'].forEach(id=>{ qs('#tab-'+id).style.display=(id===t)?'':'none'; }); });
+qs('#btn-save').onclick=()=>{ save(); toast('Salvo!'); };
+qs('#btn-reset').onclick=()=>{ if(confirm('Apagar save e reiniciar?')){ localStorage.removeItem('vw-tw'); S=deepClone(DEFAULT_STATE); init3DSync(); toast('Save apagado.'); render(); } };
+qs('#btn-trade').onclick=()=>{
+  const f=qs('#trade-from').value, t=qs('#trade-to').value; if(f===t) return toast('Escolha recursos diferentes.', true);
+  const amt=parseInt(qs('#trade-amt').value||'0',10); if(amt<=0) return;
+  if((S.recursos[f]||0)<amt) return toast('Quantidade insuficiente.', true);
+  const fee=marketFee(), recv=Math.floor(amt/(1+fee)); S.recursos[f]-=amt; S.recursos[t]=Math.min(storageCap(), (S.recursos[t]||0)+recv);
+  toast('Troca feita: recebeu '+recv); renderTop(); renderMarket();
 };
-document.getElementById('btn-send-mission').onclick=()=>{
-  const diff=parseInt(document.getElementById('mission-diff').value,10);
-  const envio={
-    sword:parseInt(document.getElementById('send-sword').value||'0',10),
-    spear:parseInt(document.getElementById('send-spear').value||'0',10),
-    knight:parseInt(document.getElementById('send-knight').value||'0',10),
-    ram:parseInt(document.getElementById('send-ram').value||'0',10),
-    cata:parseInt(document.getElementById('send-cata').value||'0',10),
-    thief:parseInt(document.getElementById('send-thief').value||'0',10),
-    mage:parseInt(document.getElementById('send-mage').value||'0',10),
-    novice:parseInt(document.getElementById('send-novice').value||'0',10),
-    pally:parseInt(document.getElementById('send-pally').value||'0',10),
-  };
-  const tot=Object.values(envio).reduce((a,b)=>a+b,0); if(tot<=0) return toast('Envie ao menos 1 unidade.');
-  enviarMissao(diff, envio);
-  ['send-sword','send-spear','send-knight','send-ram','send-cata','send-thief','send-mage','send-novice','send-pally'].forEach(id=>document.getElementById(id).value=0);
+qs('#btn-send-mission').onclick=()=>{
+  const diff=parseInt(qs('#mission-diff').value,10);
+  const envio={ sword:parseInt(qs('#send-sword').value||'0',10), spear:parseInt(qs('#send-spear').value||'0',10), knight:parseInt(qs('#send-knight').value||'0',10), ram:parseInt(qs('#send-ram').value||'0',10), cata:parseInt(qs('#send-cata').value||'0',10), thief:parseInt(qs('#send-thief').value||'0',10), mage:parseInt(qs('#send-mage').value||'0',10), novice:parseInt(qs('#send-novice').value||'0',10), pally:parseInt(qs('#send-pally').value||'0',10) };
+  const tot=Object.values(envio).reduce((a,b)=>a+b,0); if(tot<=0) return toast('Envie ao menos 1 unidade.', true);
+  sendMission(diff, envio); ['send-sword','send-spear','send-knight','send-ram','send-cata','send-thief','send-mage','send-novice','send-pally'].forEach(id=>qs('#'+id).value=0);
 };
 
 /* ===== 3D ===== */
-let renderer, scene, camera, raycaster, mouse; const meshes={}; const tip=document.getElementById('hover-tip');
+let renderer, scene, camera, raycaster, mouse; const meshes={}; const tip=qs('#hover-tip');
 function init3D(){
   try{
-    const el=document.getElementById('scene3d');
+    const el=qs('#scene3d');
     scene=new THREE.Scene();
-    const skyTop = 0xa6d2ff, skyHorizon = 0x8bcf6a;
+    const skyTop=0xa6d2ff, skyHorizon=0x8bcf6a;
     scene.fog=new THREE.Fog(0x88c97a, 60, 180);
-
     const w=el.clientWidth,h=el.clientHeight;
-    camera=new THREE.PerspectiveCamera(44, w/h, 0.1, 500);
-    camera.position.set(36, 22, 40);
-    camera.lookAt(0, 3, 0);
-
-    renderer=new THREE.WebGLRenderer({antialias:true});
-    renderer.setSize(w,h);
-    renderer.setPixelRatio(window.devicePixelRatio||1);
-    renderer.setClearColor(skyTop, 1);
-    renderer.shadowMap.enabled=true;
-    renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-    el.appendChild(renderer.domElement);
-
-    // chao + decoração
-    const ground=new THREE.Mesh(new THREE.CylinderGeometry(34,34,1,120), new THREE.MeshLambertMaterial({color:0x8dbf6e}));
-    ground.position.y=-0.5; ground.receiveShadow=true; scene.add(ground);
-    const ringMat=new THREE.MeshLambertMaterial({color:0xe1cfaa});
-    const ring=new THREE.Mesh(new THREE.TorusGeometry(13,0.8,18,80), ringMat); ring.rotation.x=Math.PI/2; ring.position.y=0.02; ring.receiveShadow=true; scene.add(ring);
-
-    const hemi=new THREE.HemisphereLight(0xdef6ff, 0x6fa45a, 0.6); scene.add(hemi);
-    const sun=new THREE.DirectionalLight(0xfff6e8, 0.95); sun.position.set(50,70,30); sun.castShadow=true;
-    sun.shadow.mapSize.set(2048,2048);
-    sun.shadow.camera.left=-70; sun.shadow.camera.right=70; sun.shadow.camera.top=70; sun.shadow.camera.bottom=-70;
-    scene.add(sun);
-
-    const pal=new THREE.Group(); const postGeo=new THREE.CylinderGeometry(0.34,0.5,4.4,6); const postMat=new THREE.MeshLambertMaterial({color:0x7a5a32});
-    const postCount=92,R=28.2;
-    for(let i=0;i<postCount;i++){ const a=i/postCount*Math.PI*2; const m=new THREE.Mesh(postGeo,postMat); m.position.set(Math.cos(a)*R,1.9,Math.sin(a)*R); m.rotation.y=-a; m.castShadow=true; m.receiveShadow=true; pal.add(m); }
-    scene.add(pal);
-
-    // posições dos prédios em anel
+    camera=new THREE.PerspectiveCamera(44, w/h, 0.1, 500); camera.position.set(36,22,40); camera.lookAt(0,3,0);
+    renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setSize(w,h); renderer.setPixelRatio(window.devicePixelRatio||1); renderer.setClearColor(skyTop,1); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; el.appendChild(renderer.domElement);
+    const ground=new THREE.Mesh(new THREE.CylinderGeometry(34,34,1,120), new THREE.MeshLambertMaterial({color:0x8dbf6e})); ground.position.y=-0.5; ground.receiveShadow=true; scene.add(ground);
+    const ringMat=new THREE.MeshLambertMaterial({color:0xe1cfaa}); const ring=new THREE.Mesh(new THREE.TorusGeometry(13,0.8,18,80), ringMat); ring.rotation.x=Math.PI/2; ring.position.y=0.02; ring.receiveShadow=true; scene.add(ring);
+    const hemi=new THREE.HemisphereLight(0xdef6ff,0x6fa45a,0.6); scene.add(hemi);
+    const sun=new THREE.DirectionalLight(0xfff6e8,0.95); sun.position.set(50,70,30); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.left=-70; sun.shadow.camera.right=70; sun.shadow.camera.top=70; sun.shadow.camera.bottom=-70; scene.add(sun);
+    const pal=new THREE.Group(); const postGeo=new THREE.CylinderGeometry(0.34,0.5,4.4,6); const postMat=new THREE.MeshLambertMaterial({color:0x7a5a32}); const postCount=92,R=28.2;
+    for(let i=0;i<postCount;i++){ const a=i/postCount*Math.PI*2; const m=new THREE.Mesh(postGeo,postMat); m.position.set(Math.cos(a)*R,1.9,Math.sin(a)*R); m.rotation.y=-a; m.castShadow=true; m.receiveShadow=true; pal.add(m); } scene.add(pal);
     const ordem=['hq','praca','bosque','argila','ferro','fazenda','armazem','mercado','quartel','estabulo','oficina','muralha','esconderijo','ferreiro','estatua','academia','igreja'];
     const radius=19.6;
-    ordem.forEach((id,idx)=>{
-      const ang=(idx/ordem.length)*Math.PI*2 + 0.25;
-      const x=Math.cos(ang)*radius, z=Math.sin(ang)*radius;
-      const g=meshPredio(id); g.position.set(x,0,z); g.lookAt(0,0,0);
-      g.traverse(o=>{o.castShadow=true; o.receiveShadow=true;});
-      scene.add(g); meshes[id]=g;
-    });
-
+    ordem.forEach((id,idx)=>{ const ang=(idx/ordem.length)*Math.PI*2 + 0.25; const x=Math.cos(ang)*radius, z=Math.sin(ang)*radius; const g=mesh(id); g.position.set(x,0,z); g.lookAt(0,0,0); g.traverse(o=>{o.castShadow=true;o.receiveShadow=true;}); scene.add(g); meshes[id]=g; });
     raycaster=new THREE.Raycaster(); mouse=new THREE.Vector2();
     el.addEventListener('mousemove',e=>{const rect=renderer.domElement.getBoundingClientRect(); mouse.x=((e.clientX-rect.left)/rect.width)*2-1; mouse.y= -((e.clientY-rect.top)/rect.height)*2+1;});
     el.addEventListener('click',on3DClick);
-
-    window.addEventListener('resize',()=>{
-      const w2=el.clientWidth,h2=el.clientHeight;
-      camera.aspect=w2/h2; camera.updateProjectionMatrix();
-      renderer.setSize(w2,h2);
-    });
-
+    window.addEventListener('resize',()=>{ const w2=el.clientWidth,h2=el.clientHeight; camera.aspect=w2/h2; camera.updateProjectionMatrix(); renderer.setSize(w2,h2); });
     animate3D();
-  }catch(e){ document.getElementById('three-warning').style.display='block'; console.error(e); }
+  }catch(e){ qs('#three-warning').style.display='block'; console.error(e); toast('Erro 3D: '+e.message, true); }
 }
 function roof(r,h,c){ const m=new THREE.Mesh(new THREE.ConeGeometry(r,h,4), new THREE.MeshLambertMaterial({color:c})); m.rotation.y=Math.PI/4; return m; }
 function scaleByLevel(g,l){ const s=0.95 + l*0.08; g.scale.set(s,0.95+l*0.12,s); }
-function meshPredio(id){
-  const group=new THREE.Group(); const lvl=nivel(id);
-  const base=new THREE.Mesh(new THREE.CylinderGeometry(2.8,2.8,0.35,16), new THREE.MeshLambertMaterial({color:0xd9c79c})); base.position.y=0.175; group.add(base);
+function mesh(id){
+  const g=new THREE.Group(); const lvl=nivel(id);
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(2.8,2.8,0.35,16), new THREE.MeshLambertMaterial({color:0xd9c79c})); base.position.y=0.175; g.add(base);
   const wood=0x835634, stone=0x9a9a9a, roofC=0xbb6b3b, thatch=0xd7c068;
   let core;
   switch(id){
-    case 'hq': { const b1=new THREE.Mesh(new THREE.BoxGeometry(3.4,2.2,2.8), new THREE.MeshLambertMaterial({color:stone})); b1.position.y=1.4; group.add(b1); const tower=new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,3.6,10), new THREE.MeshLambertMaterial({color:0xbdbdbd})); tower.position.set(1.2,2.4,0.3); group.add(tower); const r=roof(2.2,1.1,roofC); r.position.y=2.6; group.add(r);} break;
-    case 'quartel': core=new THREE.Mesh(new THREE.BoxGeometry(3.6,1.6,2.2), new THREE.MeshLambertMaterial({color:stone})); core.position.y=1.2; group.add(core); group.add(roof(2.1,0.9,thatch)).position.y=1.9; break;
-    case 'estabulo': core=new THREE.Mesh(new THREE.BoxGeometry(3.4,1.4,2.2), new THREE.MeshLambertMaterial({color:0xcaa06a})); core.position.y=1.1; group.add(core); break;
-    case 'oficina': core=new THREE.Mesh(new THREE.BoxGeometry(3.0,1.4,2.4), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.2; group.add(core); break;
-    case 'ferreiro': core=new THREE.Mesh(new THREE.BoxGeometry(2.6,1.6,2.0), new THREE.MeshLambertMaterial({color:0x9e9e9e})); core.position.y=1.2; group.add(core); break;
-    case 'mercado': core=new THREE.Mesh(new THREE.BoxGeometry(2.8,1.2,2.0), new THREE.MeshLambertMaterial({color:0xd9c79c})); core.position.y=1.0; group.add(core); break;
-    case 'bosque': core=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.6,2.4), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.1; group.add(core); group.add(roof(1.9,1.0,thatch)).position.y=1.9; break;
-    case 'argila': core=new THREE.Mesh(new THREE.ConeGeometry(1.7,1.5,8), new THREE.MeshLambertMaterial({color:0xb5653e})); core.position.y=1.2; group.add(core); break;
-    case 'ferro': core=new THREE.Mesh(new THREE.ConeGeometry(1.7,1.8,6), new THREE.MeshLambertMaterial({color:0x6d6d75})); core.position.y=1.3; group.add(core); break;
-    case 'fazenda': core=new THREE.Mesh(new THREE.BoxGeometry(2.8,0.6,2.8), new THREE.MeshLambertMaterial({color:0xc8d87a})); core.position.y=0.6; group.add(core); break;
-    case 'armazem': core=new THREE.Mesh(new THREE.BoxGeometry(3.4,1.6,2.6), new THREE.MeshLambertMaterial({color:0xcab389})); core.position.y=1.1; group.add(core); break;
-    case 'muralha': core=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.2,2.6,8), new THREE.MeshLambertMaterial({color:0x9a9a9a})); core.position.y=1.6; group.add(core); break;
-    case 'esconderijo': core=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.2,1.8), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.0; group.add(core); break;
-    case 'praca': core=new THREE.Mesh(new THREE.CylinderGeometry(2.0,2.0,0.6,14), new THREE.MeshLambertMaterial({color:0xcdbb96})); core.position.y=0.8; group.add(core); break;
-    case 'estatua': core=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.9,2.2,8), new THREE.MeshLambertMaterial({color:0xbdbdbd})); core.position.y=1.4; group.add(core); break;
-    case 'academia': core=new THREE.Mesh(new THREE.BoxGeometry(3.0,1.6,2.2), new THREE.MeshLambertMaterial({color:0x8aa3c2})); core.position.y=1.2; group.add(core); break;
-    case 'igreja': core=new THREE.Mesh(new THREE.BoxGeometry(2.6,1.8,2.0), new THREE.MeshLambertMaterial({color:0xd6d2b0})); core.position.y=1.3; group.add(core); const cr=roof(1.6,0.8,0xc49a6c); cr.position.y=2.0; group.add(cr); break;
+    case 'hq': { const b1=new THREE.Mesh(new THREE.BoxGeometry(3.4,2.2,2.8), new THREE.MeshLambertMaterial({color:stone})); b1.position.y=1.4; g.add(b1); const tower=new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,3.6,10), new THREE.MeshLambertMaterial({color:0xbdbdbd})); tower.position.set(1.2,2.4,0.3); g.add(tower); const r=roof(2.2,1.1,roofC); r.position.y=2.6; g.add(r);} break;
+    case 'quartel': core=new THREE.Mesh(new THREE.BoxGeometry(3.6,1.6,2.2), new THREE.MeshLambertMaterial({color:stone})); core.position.y=1.2; g.add(core); const rf=roof(2.1,0.9,thatch); rf.position.y=1.9; g.add(rf); break;
+    case 'estabulo': core=new THREE.Mesh(new THREE.BoxGeometry(3.4,1.4,2.2), new THREE.MeshLambertMaterial({color:0xcaa06a})); core.position.y=1.1; g.add(core); break;
+    case 'oficina': core=new THREE.Mesh(new THREE.BoxGeometry(3.0,1.4,2.4), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.2; g.add(core); break;
+    case 'ferreiro': core=new THREE.Mesh(new THREE.BoxGeometry(2.6,1.6,2.0), new THREE.MeshLambertMaterial({color:0x9e9e9e})); core.position.y=1.2; g.add(core); break;
+    case 'mercado': core=new THREE.Mesh(new THREE.BoxGeometry(2.8,1.2,2.0), new THREE.MeshLambertMaterial({color:0xd9c79c})); core.position.y=1.0; g.add(core); break;
+    case 'bosque': core=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.6,2.4), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.1; g.add(core); const rr=roof(1.9,1.0,thatch); rr.position.y=1.9; g.add(rr); break;
+    case 'argila': core=new THREE.Mesh(new THREE.ConeGeometry(1.7,1.5,8), new THREE.MeshLambertMaterial({color:0xb5653e})); core.position.y=1.2; g.add(core); break;
+    case 'ferro': core=new THREE.Mesh(new THREE.ConeGeometry(1.7,1.8,6), new THREE.MeshLambertMaterial({color:0x6d6d75})); core.position.y=1.3; g.add(core); break;
+    case 'fazenda': core=new THREE.Mesh(new THREE.BoxGeometry(2.8,0.6,2.8), new THREE.MeshLambertMaterial({color:0xc8d87a})); core.position.y=0.6; g.add(core); break;
+    case 'armazem': core=new THREE.Mesh(new THREE.BoxGeometry(3.4,1.6,2.6), new THREE.MeshLambertMaterial({color:0xcab389})); core.position.y=1.1; g.add(core); break;
+    case 'muralha': core=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.2,2.6,8), new THREE.MeshLambertMaterial({color:0x9a9a9a})); core.position.y=1.6; g.add(core); break;
+    case 'esconderijo': core=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.2,1.8), new THREE.MeshLambertMaterial({color:wood})); core.position.y=1.0; g.add(core); break;
+    case 'praca': core=new THREE.Mesh(new THREE.CylinderGeometry(2.0,2.0,0.6,14), new THREE.MeshLambertMaterial({color:0xcdbb96})); core.position.y=0.8; g.add(core); break;
+    case 'estatua': core=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.9,2.2,8), new THREE.MeshLambertMaterial({color:0xbdbdbd})); core.position.y=1.4; g.add(core); break;
+    case 'academia': core=new THREE.Mesh(new THREE.BoxGeometry(3.0,1.6,2.2), new THREE.MeshLambertMaterial({color:0x8aa3c2})); core.position.y=1.2; g.add(core); break;
+    case 'igreja': core=new THREE.Mesh(new THREE.BoxGeometry(2.6,1.8,2.0), new THREE.MeshLambertMaterial({color:0xd6d2b0})); core.position.y=1.3; g.add(core); const cr=roof(1.6,0.8,0xc49a6c); cr.position.y=2.0; g.add(cr); break;
   }
-  scaleByLevel(group, lvl);
-  group.userData.id=id; return group;
+  scaleByLevel(g,lvl); g.userData.id=id; return g;
 }
 function updateMesh(id){ const g=meshes[id]; if(!g) return; scaleByLevel(g, nivel(id)); }
-function animate3D(){
-  requestAnimationFrame(animate3D);
-  if(!renderer) return;
-  raycaster.setFromCamera(mouse,camera);
-  const hits=raycaster.intersectObjects(Object.values(meshes),true);
+function animate3D(){ requestAnimationFrame(animate3D); if(!renderer) return; raycaster.setFromCamera(mouse,camera); const hits=raycaster.intersectObjects(Object.values(meshes),true);
   if(hits.length>0){ let p=hits[0].object; while(p && !p.userData.id) p=p.parent; if(p && p.userData.id){ tip.style.display='block'; tip.textContent=BUILDINGS[p.userData.id].nome+' — N '+nivel(p.userData.id); } } else { tip.style.display='none' }
   renderer.render(scene,camera);
 }
 function on3DClick(e){
-  const rect=renderer.domElement.getBoundingClientRect();
-  const mx=((e.clientX-rect.left)/rect.width)*2-1;
-  const my= -((e.clientY-rect.top)/rect.height)*2+1;
-  raycaster.setFromCamera({x:mx,y:my}, camera);
-  const hits=raycaster.intersectObjects(Object.values(meshes),true);
-  if(hits.length>0){ let p=hits[0].object; while(p && !p.userData.id) p=p.parent; if(p && p.userData.id){ const id=p.userData.id; const card=document.querySelector('[data-card="'+id+'"]'); if(card){ card.scrollIntoView({behavior:'smooth',block:'center'}); card.style.outline='3px solid #2f7a3e'; setTimeout(()=>card.style.outline='',1200) } } }
+  const rect=renderer.domElement.getBoundingClientRect(); const mx=((e.clientX-rect.left)/rect.width)*2-1; const my= -((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera({x:mx,y:my}, camera); const hits=raycaster.intersectObjects(Object.values(meshes),true);
+  if(hits.length>0){ let p=hits[0].object; while(p && !p.userData.id) p=p.parent; if(p && p.userData.id){ const id=p.userData.id; const card=document.querySelector('[data-card=\"'+id+'\"]'); if(card){ card.scrollIntoView({behavior:'smooth',block:'center'}); card.style.outline='3px solid #2f7a3e'; setTimeout(()=>card.style.outline='',1200) } } }
 }
 function init3DSync(){ Object.keys(meshes).forEach(updateMesh) }
 
 /* Boot */
-document.getElementById('btn-save').addEventListener('click', salvar);
-window.addEventListener('beforeunload', salvar);
+window.addEventListener('beforeunload', save);
 init3D(); render(); requestAnimationFrame(tick);
 </script>
 </body>
