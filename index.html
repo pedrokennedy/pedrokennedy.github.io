@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Village Wars — 3D Isometric (Clean)</title>
+<title>Village Wars — 3D Isometric (Clean v2)</title>
 <style>
   :root{
     --bg:#e9dec1;--panel:#f7f0db;--wood:#8b5a2b;--wood-dark:#5d3b1a;--ink:#3a2a17;
@@ -210,8 +210,8 @@ const DEFAULT_STATE = {
   reservedPop:0,
 };
 let state = loadState();
-function loadState(){ try{ const raw=localStorage.getItem('vw-save-iso-clean'); if(raw){ const s=JSON.parse(raw); return {...DEFAULT_STATE, ...s}; } }catch(e){} return deepClone(DEFAULT_STATE) }
-function saveState(){ localStorage.setItem('vw-save-iso-clean', JSON.stringify(state)) }
+function loadState(){ try{ const raw=localStorage.getItem('vw-save-iso-clean2'); if(raw){ const s=JSON.parse(raw); return {...DEFAULT_STATE, ...s}; } }catch(e){} return deepClone(DEFAULT_STATE) }
+function saveState(){ localStorage.setItem('vw-save-iso-clean2', JSON.stringify(state)) }
 
 /* ===== Calculations ===== */
 const buildingLevel = (id)=>state.buildings[id]||0;
@@ -469,7 +469,7 @@ function render(){ renderResources(); renderBuildings(); renderTraining(); rende
 /* ===== UI wiring ===== */
 document.querySelectorAll('.tab-btn').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); const t=b.dataset.tab; ['units','missions','market','army','help'].forEach(id=>{ document.getElementById('tab-'+id).style.display=(id===t)?'':'none'; }); });
 document.getElementById('btn-save').onclick=()=>{ saveState(); alert('Game saved!'); };
-document.getElementById('btn-reset').onclick=()=>{ if(confirm('Wipe your save and restart?')){ localStorage.removeItem('vw-save-iso-clean'); state=deepClone(DEFAULT_STATE); init3DStateSync(); } };
+document.getElementById('btn-reset').onclick=()=>{ if(confirm('Wipe your save and restart?')){ localStorage.removeItem('vw-save-iso-clean2'); state=deepClone(DEFAULT_STATE); init3DStateSync(); } };
 document.getElementById('btn-trade').onclick=()=>{ const f=document.getElementById('trade-from').value, t=document.getElementById('trade-to').value; if(f===t) return alert('Pick different resources.'); const a=parseInt(document.getElementById('trade-amt').value||'0',10); if(a<=0) return; if(state.resources[f]<a) return alert('Not enough to trade.'); const fee=buildingEffects().fee; const r=Math.floor(a*(1-fee)); state.resources[f]-=a; state.resources[t]+=r; renderResources(); renderMarket(); };
 document.getElementById('btn-send-mission').onclick=()=>{ const diff=parseInt(document.getElementById('mission-diff').value,10); const send={ infantry:parseInt(document.getElementById('send-infantry').value||'0',10), archer:parseInt(document.getElementById('send-archer').value||'0',10), cavalry:parseInt(document.getElementById('send-cavalry').value||'0',10) }; const tot=send.infantry+send.archer+send.cavalry; if(tot<=0) return alert('Send at least one unit.'); sendMission(diff,send); document.getElementById('send-infantry').value=0; document.getElementById('send-archer').value=0; document.getElementById('send-cavalry').value=0; renderMissions(); };
 
@@ -551,7 +551,6 @@ function update3DHover(){ /* Nothing extra for now */ }
 function init3DStateSync(){ Object.keys(meshes).forEach(id=>updateBuildingMesh(id)); }
 
 /* ===== Boot ===== */
-function renderMarket(){ document.getElementById('trade-fee').textContent=percent(buildingEffects().fee)+'%'; }
 window.addEventListener('beforeunload', saveState);
 init3D();
 render();
